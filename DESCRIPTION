@@ -1,0 +1,17 @@
+Package: QForm
+Type: Package
+Title: Bounding and simulation of quadratic form probabilities
+Version: 0.1.0
+Authors@R: c(person("Louis J. M.", "Aslett", email = "louis@louisaslett.com", role = c("aut", "cre")),
+            person("Ryan", "Christ", email = "ryan.christ@st-hildas.ox.ac.uk", role = c("aut")))
+Maintainer: Louis J. M. Aslett <louis@louisaslett.com>
+Description: Provides implementations of upper and lower bounds on the CDF of
+  a quadratic form in arbitrary independent real random variables.  Efficient
+  exact simulation methods forthcoming.
+License: GPL-2
+Encoding: UTF-8
+LazyData: true
+Imports: stats,
+  RSpectra,
+  CompQuadForm,
+  Matrix

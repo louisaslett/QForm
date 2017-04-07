@@ -1,0 +1,7 @@
+useDynLib(QForm, .registration = TRUE, .fixes = "C_")
+exportPattern("^[[:alpha:]]+")
+importFrom("stats", "optimize")
+importFrom("RSpectra", "eigs")
+importFrom("CompQuadForm", "davies")
+importClassesFrom("Matrix", "dsyMatrix", "dgeMatrix")
+importMethodsFrom("Matrix", "diag", "crossprod")
