@@ -6,9 +6,10 @@ typedef union {
   double d64;
 } dbl_64;
 
-void machine_eps(double* value) {
+// [[Rcpp::export]]
+double machine_eps(double value) {
   dbl_64 s;
-  s.d64 = *value;
+  s.d64 = value;
   s.i64++;
-  *value = s.d64 - *value;
+  return(s.d64 - value);
 }

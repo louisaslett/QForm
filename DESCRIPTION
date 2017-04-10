@@ -11,7 +11,9 @@ Description: Provides implementations of upper and lower bounds on the CDF of
 License: GPL-2
 Encoding: UTF-8
 LazyData: true
-Imports: stats,
+Imports: CompQuadForm,
+  Matrix,
+  Rcpp (>= 0.12.9),
   RSpectra,
-  CompQuadForm,
-  Matrix
+  stats
+LinkingTo: Rcpp
