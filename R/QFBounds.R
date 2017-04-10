@@ -5,8 +5,8 @@ QFBounds <- function(obs, M, mu, sigma, k = c(20), lower.tail = TRUE, log = FALS
   if(!all(diag(M) == 0)) {
     stop("M must be a hollow matrix (zero on diagonal).")
   }
-  if(!is.vector(y)) {
-    stop("y must be a vector.")
+  if(!is.vector(obs)) {
+    stop("obs must be a vector.")
   }
   # obs <- suppressMessages(as.numeric(crossprod(crossprod(M, y), y)))
   N <- nrow(M)
