@@ -43,11 +43,11 @@ QFBounds2 <- function(obs, evals, ncps, E_R, nu2, N, lower.tail = TRUE, log = FA
                                tol = opt_tol)$objective)
   upper <- min(upper, 0)
 
-  if(isTRUE(all.equal(lower, upper))) {
-    lower <- -Inf
-    upper <- 0
-    warning("Double precision floating point lack sufficient precision to accurately optimize bounds.  Returning trivial bounds.")
-  }
+  # if(isTRUE(all.equal(lower, upper))) {
+  #   lower <- -Inf
+  #   upper <- 0
+  #   warning("Double precision floating point lack sufficient precision to accurately optimize bounds.  Returning trivial bounds.")
+  # }
 
   if(lower.tail) {
     return(data.frame(lower = ifelse(log, lower, exp(lower)),
