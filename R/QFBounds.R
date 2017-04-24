@@ -29,7 +29,7 @@ QFBounds <- function(obs, M, mu, sigma, k = c(20), lower.tail = TRUE, log = FALS
   E_R <- list()
   for(kk in 1:length(k)) {
     R <- (M.tilde - evec.tilde[,1:k[kk]] %*% (t(evec.tilde[,1:k[kk]]) * eval.tilde[1:k[kk]])) / N
-    nu2[[kk]] <- 8 * (sum((R %*% mu.tilde)^2) + sum(R^2))
+    nu2[[kk]] <- 8 * sum((R %*% mu.tilde)^2) + 4 * sum(R^2)
     E_R[[kk]] <- as.numeric(mu.tilde %*% R %*% mu.tilde + sum(diag(R)))
   }
 
