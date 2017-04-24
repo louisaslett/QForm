@@ -1,4 +1,4 @@
-QFBounds <- function(obs, M, mu, sigma, k = c(20), lower.tail = TRUE, log = FALSE) {
+QFBounds <- function(obs, M, mu, sigma, k = c(20), resid_operator_norm_bound=NULL,lower.tail = TRUE, log = FALSE) {
   if(class(M) != "dsyMatrix") {
     stop("Matrix M must be symmetric of class dsyMatrix (from Matrix package).")
   }
@@ -18,8 +18,12 @@ QFBounds <- function(obs, M, mu, sigma, k = c(20), lower.tail = TRUE, log = FALS
   evec.tilde <- e$vectors[, order(abs(e$values), decreasing=TRUE)]
   eval.tilde <- e$values[order(abs(e$values), decreasing=TRUE)]
 
+  # Set resid_operator_norm_bound to magnitude of smallest truncated eigenvalue if not specified
+  if(is.null(resid_operator_norm_bound)){resid_operator_norm_bound <- abs(eval.tilde[length(eval.tilde)]) }
+
   # Compute ncps
   ncps <- list()
+
   for(kk in 1:length(k)) {
     ncps[[kk]] <- c(crossprod(evec.tilde[,1:k[kk]], mu.tilde))^2
   }
@@ -39,7 +43,7 @@ QFBounds <- function(obs, M, mu, sigma, k = c(20), lower.tail = TRUE, log = FALS
     for(i in 1:length(obs)) {
       res <- rbind(res, c(k = k[kk],
                           obs = obs[i],
-                          QFBounds2(obs[i], eval.tilde[1:k[kk]], ncps[[kk]], E_R[[kk]], nu2[[kk]], N, lower.tail, log)))
+                          QFBounds2(obs[i], eval.tilde[1:k[kk]], ncps[[kk]], E_R[[kk]], nu2[[kk]], N,resid_operator_norm_bound, lower.tail, log)))
     }
   }
   res

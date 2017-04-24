@@ -1,4 +1,4 @@
-QFBounds2 <- function(obs, evals, ncps, E_R, nu2, N, lower.tail = TRUE, log = FALSE) {
+QFBounds2 <- function(obs, evals, ncps, E_R, nu2, N, resid_operator_norm_bound, lower.tail = TRUE, log = FALSE) {
   obs <- obs/N
 
   # What is the machine precision we care about
@@ -29,6 +29,7 @@ QFBounds2 <- function(obs, evals, ncps, E_R, nu2, N, lower.tail = TRUE, log = FA
                                ncps = ncps,
                                E_R = E_R,
                                nu2 = nu2,
+                               resid_operator_norm_bound=resid_operator_norm_bound,
                                maximum = TRUE,
                                tol = opt_tol)$objective)
 
@@ -39,6 +40,7 @@ QFBounds2 <- function(obs, evals, ncps, E_R, nu2, N, lower.tail = TRUE, log = FA
                                ncps = ncps,
                                E_R = E_R,
                                nu2 = nu2,
+                               resid_operator_norm_bound=resid_operator_norm_bound,
                                maximum = FALSE,
                                tol = opt_tol)$objective)
   upper <- min(upper, 0)
@@ -58,9 +60,8 @@ QFBounds2 <- function(obs, evals, ncps, E_R, nu2, N, lower.tail = TRUE, log = FA
   }
 }
 
-QFBounds.ineq.lower <- function(eps, obs, evals, ncps, E_R, nu2) {
+QFBounds.ineq.lower <- function(eps, obs, evals, ncps, E_R, nu2,resid_operator_norm_bound) {
   a <- eps - E_R
-  resid_operator_norm_bound <- abs(evals[length(evals)])
   F_H <- -davies(q = c(obs-eps),
                  lambda = evals,
                  delta = ncps,
@@ -75,9 +76,8 @@ QFBounds.ineq.lower <- function(eps, obs, evals, ncps, E_R, nu2) {
   }
 }
 
-QFBounds.ineq.upper <- function(eps, obs, evals, ncps, E_R, nu2) {
+QFBounds.ineq.upper <- function(eps, obs, evals, ncps, E_R, nu2,resid_operator_norm_bound) {
   a <- eps - E_R
-  resid_operator_norm_bound <- abs(evals[length(evals)])
   F_H <- -davies(q = c(obs+eps),
                  lambda = evals,
                  delta = ncps,
