@@ -1,4 +1,7 @@
 QFBounds <- function(obs, M, mu, sigma, k = c(20), resid_operator_norm_bound=NULL,lower.tail = TRUE, log = FALSE) {
+
+  # All input must be on the original scale.  obs= y^T M y
+
   if(class(M) != "dsyMatrix") {
     stop("Matrix M must be symmetric of class dsyMatrix (from Matrix package).")
   }
@@ -32,7 +35,7 @@ QFBounds <- function(obs, M, mu, sigma, k = c(20), resid_operator_norm_bound=NUL
   nu2 <- list()
   E_R <- list()
   for(kk in 1:length(k)) {
-    R <- (M.tilde - evec.tilde[,1:k[kk]] %*% (t(evec.tilde[,1:k[kk]]) * eval.tilde[1:k[kk]])) / N
+    R <- (M.tilde - evec.tilde[,1:k[kk]] %*% (t(evec.tilde[,1:k[kk]]) * eval.tilde[1:k[kk]]))
     nu2[[kk]] <- 8 * sum((R %*% mu.tilde)^2) + 4 * sum(R^2)
     E_R[[kk]] <- as.numeric(mu.tilde %*% R %*% mu.tilde + sum(diag(R)))
   }

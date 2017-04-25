@@ -72,46 +72,6 @@ QFBounds3 <- function(obs, evals, ncps, E_R, nu2, N, lower.tail = TRUE, log = FA
   }
 }
 
-QFBounds.ineq.lower <- function(eps, obs, evals, ncps, E_R, nu2) {
-  a <- eps - E_R
-  resid_operator_norm_bound <- abs(evals[length(evals)])
-  F_H <- -davies(q = c(obs-eps),
-                 lambda = evals,
-                 delta = ncps,
-                 acc = 1e-12)$Qq -
-    exp(ifelse(a <= nu2 / abs(4*resid_operator_norm_bound),
-               -0.5*(a^2) / nu2,
-               0.5*nu2 / (abs(4*resid_operator_norm_bound)^2) - a / abs(4*resid_operator_norm_bound)))
-  if(F_H <= -1 || F_H == 0) {
-    return(-.Machine$double.xmax)
-  } else {
-    return(log1p(F_H))
-  }
-}
-
-QFBounds.ineq.upper <- function(eps, obs, evals, ncps, E_R, nu2) {
-  a <- eps - E_R
-  resid_operator_norm_bound <- abs(evals[length(evals)])
-  F_H <- -davies(q = c(obs+eps),
-                 lambda = evals,
-                 delta = ncps,
-                 acc = 1e-12)$Qq +
-    exp(ifelse(a <= nu2 / abs(4*resid_operator_norm_bound),
-               -0.5*(a^2) / nu2,
-               0.5*nu2 / (abs(4*resid_operator_norm_bound)^2) - a / abs(4*resid_operator_norm_bound)))
-  if(F_H <= -1) {
-    return(.Machine$double.xmax)
-  } else {
-    return(log1p(F_H))
-  }
-}
-
-
-RemainderBoundSupportFinder <- function(x, resid_operator_norm_bound, ncps, E_R, nu2) {
-  a <- x - E_R
-  0.5*nu2 / (abs(4*resid_operator_norm_bound)^2) - a / abs(4*resid_operator_norm_bound) - 1e-19
-}
-
 
 
 
