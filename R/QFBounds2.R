@@ -1,5 +1,7 @@
 QFBounds2 <- function(obs, evals, ncps, E_R, nu2, N, resid_operator_norm_bound, lower.tail = TRUE, log = FALSE,if.insufficient.eigs="trivial") {
 
+  # PRELIMINARY CALCULATIONS
+
   # Input Sanity Check
   if(!(if.insufficient.eigs%in%c("missing","trivial"))){stop("if.insufficient.eigs must be set to return ``trivial`` or return ``missing`` bounds ")}
 
@@ -22,76 +24,110 @@ QFBounds2 <- function(obs, evals, ncps, E_R, nu2, N, resid_operator_norm_bound, 
   opt_tol <- min(c(machine_eps(abs(E_R)), machine_eps(abs(obs))))
 
 
-  # INPUT CHECKS
 
-  # Make sure that the number of eigen values we have allows us to get a sensible
+  # CHECK FOR SUFFICIENT EIGENVALUES
+
+  # We need to make sure that the number of eigen values we have allows us to get a sensible
   # result out of davies and squeeze the right interval in if not to within the
-  # tolerance that optimize will work with
+  # tolerance that optimize can work with
+
+  OK_to_optimize<-T
 
   # Ensure that the truncated distribution puts mass at obseravtion when epsilon is zero
   if(any(c(0,1) == SurvivalFunc(q = obs-E_R,
                                 lambda = evals,
                                 delta = ncps))) {
-    stop("Insufficient eigenvalues: truncated distribution does not have tails that extend out to the observation given")
+
+    OK_to_optimize<-F
+
+    if(if.insufficient.eigs=="trivial"){
+      warning("Insufficient eigenvalues: truncated distribution does not have tails that extend out to the observation given: returning trivial 0,1 bounds")
+      upper<-0
+      lower<--.Machine$double.xmax
+
+    }else{
+      warning("Insufficient eigenvalues: truncated distribution does not have tails that extend out to the observation given: returning missing bounds")
+      upper<-NA
+      lower<-NA
+    }
   }
 
 
-
-  # This check not only insures that our bounding approach has a shot of yielding a tight bound, but also that
+  # This check not only ensures that our bounding approach has a shot of yielding a tight bound, but also that
   # we will not drastically overshoot the support of the truncated distribution while optimizing our bounds.
   if(Var_T/Var_R < 100){
-    stop("Insufficient eigenvalues: truncated distribution does not have at least 10x the scale of the residual distribution.")
+
+    OK_to_optimize<-F
+
+    if(if.insufficient.eigs=="trivial"){
+      warning("Insufficient eigenvalues:  truncated distribution does not have at least 10x the scale of the residual distribution: returning trivial 0,1 bounds")
+      upper<-0
+      lower<--.Machine$double.xmax
+    }else{
+      warning("Insufficient eigenvalues:  truncated distribution does not have at least 10x the scale of the residual distribution: returning missing bounds")
+      upper<-NA
+      lower<-NA
+    }
   }
 
 
-  # Find search interval:
-  int_right<-uniroot(f=RemainderBoundSupportFinder,interval=c(nu2/(4*resid_operator_norm_bound),sqrt(Var_R)*100),resid_operator_norm_bound=resid_operator_norm_bound,nu2=nu2,extendInt = "downX",tol=1e-20)$root
 
-  # This browser is for checking that the objective/optimization is working
-  browser()
+  # BEGIN OPTIMIZATION
 
-  lower <- as.numeric(optimize(QFBounds.ineq.lower,
-                               interval = c(0, int_right),
-                               obs = obs,
-                               evals = evals,
-                               ncps = ncps,
-                               E_R = E_R,
-                               nu2 = nu2,
-                               resid_operator_norm_bound=resid_operator_norm_bound,
-                               maximum = TRUE,
-                               tol = opt_tol)$objective)
+  if(OK_to_optimize==T){
 
-  upper <- as.numeric(optimize(QFBounds.ineq.upper,
-                               interval = c(0, int_right),
-                               obs = obs,
-                               evals = evals,
-                               ncps = ncps,
-                               E_R = E_R,
-                               nu2 = nu2,
-                               resid_operator_norm_bound=resid_operator_norm_bound,
-                               maximum = FALSE,
-                               tol = opt_tol)$objective)
+    # Find search interval:
+    int_right<-uniroot(f=RemainderBoundSupportFinder,interval=c(nu2/(4*resid_operator_norm_bound),sqrt(Var_R)*100),resid_operator_norm_bound=resid_operator_norm_bound,nu2=nu2,extendInt = "downX",tol=1e-20)$root
 
-  # If upper in prob space is all geq 1, then we do not have enough eigenvalues to find a non-trivial bound
+    # This browser is for checking that the objective/optimization is working
+    #browser()
 
-  if(upper>=0 && if.insufficient.eigs=="missing"){
-    upper<-NA
-    warning("Insufficient eigenvalues: returning NA for upper bound on CDF")
+    lower <- as.numeric(optimize(QFBounds.ineq.lower,
+                                 interval = c(0, int_right),
+                                 obs = obs,
+                                 evals = evals,
+                                 ncps = ncps,
+                                 E_R = E_R,
+                                 nu2 = nu2,
+                                 resid_operator_norm_bound=resid_operator_norm_bound,
+                                 maximum = TRUE,
+                                 tol = opt_tol)$objective)
+
+    upper <- as.numeric(optimize(QFBounds.ineq.upper,
+                                 interval = c(0, int_right),
+                                 obs = obs,
+                                 evals = evals,
+                                 ncps = ncps,
+                                 E_R = E_R,
+                                 nu2 = nu2,
+                                 resid_operator_norm_bound=resid_operator_norm_bound,
+                                 maximum = FALSE,
+                                 tol = opt_tol)$objective)
+
+    # If upper in prob space is all geq 1, then we do not have enough eigenvalues to find a non-trivial bound
+
+    if(upper>=0 && if.insufficient.eigs=="missing"){
+      upper<-NA
+      warning("Insufficient eigenvalues: returning NA for upper bound on CDF")
+    }
+    if(upper>=0 && if.insufficient.eigs=="trivial"){
+      upper<-0
+      warning("Insufficient eigenvalues: returning 0 as the trivial upper bound on the log of the CDF")
+    }
+
+    # If lower in log space is -.Machine$double.xmax, then we do not have enough eigenvalues to find a non-trivial bound
+    if(lower==-.Machine$double.xmax && if.insufficient.eigs=="missing"){
+      lower<-NA
+      warning("Insufficient eigenvalues: returning NA for lower bound on CDF")
+    }
+    if(lower==-.Machine$double.xmax && if.insufficient.eigs=="trivial"){
+      warning("Insufficient eigenvalues: returning -.Machine$double.xmax as the trivial lower bound on the log of the CDF")
+    }
+
   }
-  if(upper>=0 && if.insufficient.eigs=="trivial"){
-    upper<-0
-    warning("Insufficient eigenvalues: returning 0 as the trivial upper bound on the log of the CDF")
-  }
 
-  # If lower in log space is -.Machine$double.xmax, then we do not have enough eigenvalues to find a non-trivial bound
-  if(lower==-.Machine$double.xmax && if.insufficient.eigs=="missing"){
-    lower<-NA
-    warning("Insufficient eigenvalues: returning NA for lower bound on CDF")
-  }
-  if(lower==-.Machine$double.xmax && if.insufficient.eigs=="trivial"){
-    warning("Insufficient eigenvalues: returning -.Machine$double.xmax as the trivial lower bound on the log of the CDF")
-  }
 
+  # TRANSFORM OUTPUT AS REQUIRED
 
   if(lower.tail) {
     return(data.frame(lower = ifelse(log, lower, exp(lower)),
