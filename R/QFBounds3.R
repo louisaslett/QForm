@@ -78,45 +78,45 @@ QFBounds3 <- function(obs, evals, ncps, E_R, nu2, N, lower.tail = TRUE, log = FA
 
 
 
-test_func<-function(x ,evals ,ncps){
-y<-davies(q = x,
-                  lambda = evals,
-                  delta = ncps,
-                  acc = 1e-20,lim = 40000)$Qq
-if(y<=1e-19){y<--1}
-return(y)
-}
-
-load("/Users/ryan/Documents/lab/thesis/Chapter3/chapter3_R_code/abo_min_mat_and_p_for_concentration_bounds.RData")
-require(CompQuadForm)
-require(RSpectra)
-evals<-eigs(abo_min_mat,k=25)$values
-evals<-evals[order(abs(evals),decreasing = T)]
-test<-uniroot(f=test_func,interval=c(0,35e6),f.upper=1,f.lower=-1,evals=evals,ncps=rep(0,length(evals)),extendInt = "downX",trace = ,tol=1e-18)
-test
-test_func(test$root,evals,rep(0,length(evals)))
-
-test_func(test$root-1,evals,rep(0,length(evals)))
-
-# need to build in mean as lower bound and potentially 10 sigma as upper bound?
-# then do the same for the other tail
-
-# then optimize both sides.
-
-
-concentration_bounder <- function(x, evals, ncps, E_R, nu2) {
-  a <- x - E_R
-  resid_operator_norm_bound <- abs(evals[length(evals)])
-  0.5*nu2 / (abs(4*resid_operator_norm_bound)^2) - a / abs(4*resid_operator_norm_bound) - 1e-19
-}
-
-
-nu2<-4 * sum(abo_min_mat^2)
-
-# setting the upper limit to nu2*40
-test<-uniroot(f=concentration_bounder,interval=c(nu2/(4*abs(evals[length(evals)])),sqrt((nu2/2))*100),f.upper=1,f.lower=- 1,evals=evals,ncps=rep(0,length(evals)),E_R=0,nu2=nu2,extendInt = "downX",tol=1e-20)
-concentration_bounder(test$root+10,evals=evals,ncps=rep(0,length(evals)),E_R=0,nu2=nu2)
-test$root
+# test_func<-function(x ,evals ,ncps){
+# y<-davies(q = x,
+#                   lambda = evals,
+#                   delta = ncps,
+#                   acc = 1e-20,lim = 40000)$Qq
+# if(y<=1e-19){y<--1}
+# return(y)
+# }
+#
+# load("/Users/ryan/Documents/lab/thesis/Chapter3/chapter3_R_code/abo_min_mat_and_p_for_concentration_bounds.RData")
+# require(CompQuadForm)
+# require(RSpectra)
+# evals<-eigs(abo_min_mat,k=25)$values
+# evals<-evals[order(abs(evals),decreasing = T)]
+# test<-uniroot(f=test_func,interval=c(0,35e6),f.upper=1,f.lower=-1,evals=evals,ncps=rep(0,length(evals)),extendInt = "downX",trace = ,tol=1e-18)
+# test
+# test_func(test$root,evals,rep(0,length(evals)))
+#
+# test_func(test$root-1,evals,rep(0,length(evals)))
+#
+# # need to build in mean as lower bound and potentially 10 sigma as upper bound?
+# # then do the same for the other tail
+#
+# # then optimize both sides.
+#
+#
+# concentration_bounder <- function(x, evals, ncps, E_R, nu2) {
+#   a <- x - E_R
+#   resid_operator_norm_bound <- abs(evals[length(evals)])
+#   0.5*nu2 / (abs(4*resid_operator_norm_bound)^2) - a / abs(4*resid_operator_norm_bound) - 1e-19
+# }
+#
+#
+# nu2<-4 * sum(abo_min_mat^2)
+#
+# # setting the upper limit to nu2*40
+# test<-uniroot(f=concentration_bounder,interval=c(nu2/(4*abs(evals[length(evals)])),sqrt((nu2/2))*100),f.upper=1,f.lower=- 1,evals=evals,ncps=rep(0,length(evals)),E_R=0,nu2=nu2,extendInt = "downX",tol=1e-20)
+# concentration_bounder(test$root+10,evals=evals,ncps=rep(0,length(evals)),E_R=0,nu2=nu2)
+# test$root
 
 
 

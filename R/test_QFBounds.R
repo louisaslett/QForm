@@ -1,4 +1,4 @@
-load("~/Documents/lab/thesis/Chapter3/chapter3_R_code/ABO_kenya_min_mat_concentration_bound_demonstration_workspace.RData")
+# load("~/Documents/lab/thesis/Chapter3/chapter3_R_code/ABO_kenya_min_mat_concentration_bound_demonstration_workspace.RData")
 # # #
 # # # # Everything is input on original scale, y^TBy.
 # #
