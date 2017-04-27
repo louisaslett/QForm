@@ -1,10 +1,34 @@
-QFBounds2 <- function(obs, evals, ncps, E_R, nu2, N, resid.operator.norm.bound, if.insufficient.eigs = "trivial", lower.tail = TRUE, log = FALSE) {
+#' Quadratic form bounds
+#'
+#' Compute bounds on the CDF of a quadratic form.
+#'
+#' The above was the one line summary which appears at the top of the documentation.  The gory detailed description of what is does goes here.
+#'
+#' Those gory details can span as many paragraphs as you want.
+#'
+#' @param obs scalar; the observed value of the quadratic form: that is, \eqn{y^T M y}.
+#' @param evals vector of eigen-values of the matrix \eqn{M}.  These need not be all eigen values.
+#' @param ncps description here
+#' @param E_R description here
+#' @param nu2 description here
+#' @param N description here
+#' @param resid.op.norm.bd description here
+#' @param if.insuff.eigs string indicating what action to take if there are insufficient eigen-values to produce an accurate bound.  If \code{"trivial"} then the bounds \eqn{[0,1]} are returned; if \code{"missing"} then \code{NA} is returned for both bounds.
+#' @param lower.tail logical; if \code{TRUE} (default), probability is \eqn{P(y^T M y \le obs)}, otherwise \eqn{P(y^T M y > obs)}
+#' @param log logical; if \code{TRUE}, probability \eqn{p} is given as \eqn{log(p)}
+#'
+#' @return A data frame containing the variables lower and upper which provide the bounds on the CDF of the quadratic form.
+#'
+#' @examples
+#' # Some code here which runs a self-contained example
+#'
+QFBounds2 <- function(obs, evals, ncps, E_R, nu2, N, resid.op.norm.bd, if.insuff.eigs = "trivial", lower.tail = TRUE, log = FALSE) {
 
   # PRELIMINARY CALCULATIONS
 
   # Input Sanity Check
-  if(!(if.insufficient.eigs %in% c("missing","trivial"))) {
-    stop("if.insufficient.eigs must be set to return \"trivial\" or return \"missing\" bounds.")
+  if(!(if.insuff.eigs %in% c("missing","trivial"))) {
+    stop("if.insuff.eigs must be set to return \"trivial\" or return \"missing\" bounds.")
   }
 
   # Rescale by N to keep calculations within a range of reasonable precision
@@ -12,7 +36,7 @@ QFBounds2 <- function(obs, evals, ncps, E_R, nu2, N, resid.operator.norm.bound, 
   E_R <- E_R/N
   nu2 <- nu2/(N^2)
   evals <- evals/N
-  resid.operator.norm.bound <- resid.operator.norm.bound/N
+  resid.op.norm.bd <- resid.op.norm.bd/N
 
   # Calculate the mean and variance of the truncated part of the quadratic form
   # E_T <- sum(evals*(1+ncps))
@@ -39,7 +63,7 @@ QFBounds2 <- function(obs, evals, ncps, E_R, nu2, N, resid.operator.norm.bound, 
 
     OK_to_optimize <- FALSE
 
-    if(if.insufficient.eigs == "trivial") {
+    if(if.insuff.eigs == "trivial") {
       warning("Insufficient eigenvalues: truncated distribution does not have tails that extend out to the observation given: returning trivial 0,1 bounds.")
       upper <- 0
       lower <- -.Machine$double.xmax
@@ -56,7 +80,7 @@ QFBounds2 <- function(obs, evals, ncps, E_R, nu2, N, resid.operator.norm.bound, 
 
     OK_to_optimize <- FALSE
 
-    if(if.insufficient.eigs == "trivial") {
+    if(if.insuff.eigs == "trivial") {
       warning("Insufficient eigenvalues: truncated distribution does not have at least 10x the scale of the residual distribution: returning trivial 0,1 bounds.")
       upper <- 0
       lower <- -.Machine$double.xmax
@@ -73,8 +97,8 @@ QFBounds2 <- function(obs, evals, ncps, E_R, nu2, N, resid.operator.norm.bound, 
   if(OK_to_optimize) {
     # Find search interval:
     int_right <- uniroot(f = RemainderBoundSupportFinder,
-                         interval = c(nu2/(4*resid.operator.norm.bound), sqrt(Var_R)*100),
-                         resid.operator.norm.bound = resid.operator.norm.bound,
+                         interval = c(nu2/(4*resid.op.norm.bd), sqrt(Var_R)*100),
+                         resid.op.norm.bd = resid.op.norm.bd,
                          nu2 = nu2,
                          extendInt = "downX",
                          tol = 1e-20)$root
@@ -89,7 +113,7 @@ QFBounds2 <- function(obs, evals, ncps, E_R, nu2, N, resid.operator.norm.bound, 
                                  ncps = ncps,
                                  E_R = E_R,
                                  nu2 = nu2,
-                                 resid.operator.norm.bound = resid.operator.norm.bound,
+                                 resid.op.norm.bd = resid.op.norm.bd,
                                  maximum = TRUE,
                                  tol = opt_tol)$objective)
 
@@ -100,27 +124,27 @@ QFBounds2 <- function(obs, evals, ncps, E_R, nu2, N, resid.operator.norm.bound, 
                                  ncps = ncps,
                                  E_R = E_R,
                                  nu2 = nu2,
-                                 resid.operator.norm.bound = resid.operator.norm.bound,
+                                 resid.op.norm.bd = resid.op.norm.bd,
                                  maximum = FALSE,
                                  tol = opt_tol)$objective)
 
     # If upper in prob space is all geq 1, then we do not have enough eigenvalues to find a non-trivial bound
 
-    if(upper >= 0 && if.insufficient.eigs == "missing") {
+    if(upper >= 0 && if.insuff.eigs == "missing") {
       upper <- NA
       warning("Insufficient eigenvalues: returning NA for upper bound on CDF.")
     }
-    if(upper >= 0 && if.insufficient.eigs == "trivial") {
+    if(upper >= 0 && if.insuff.eigs == "trivial") {
       upper <- 0
       warning("Insufficient eigenvalues: returning 0 as the trivial upper bound on the log of the CDF.")
     }
 
     # If lower in log space is -.Machine$double.xmax, then we do not have enough eigenvalues to find a non-trivial bound
-    if(lower == -.Machine$double.xmax && if.insufficient.eigs == "missing") {
+    if(lower == -.Machine$double.xmax && if.insuff.eigs == "missing") {
       lower <- NA
       warning("Insufficient eigenvalues: returning NA for lower bound on CDF.")
     }
-    if(lower == -.Machine$double.xmax && if.insufficient.eigs == "trivial") {
+    if(lower == -.Machine$double.xmax && if.insuff.eigs == "trivial") {
       warning("Insufficient eigenvalues: returning -.Machine$double.xmax as the trivial lower bound on the log of the CDF.")
     }
   }
@@ -138,14 +162,14 @@ QFBounds2 <- function(obs, evals, ncps, E_R, nu2, N, resid.operator.norm.bound, 
 }
 
 
-QFBounds.ineq.lower <- function(eps, obs, evals, ncps, E_R, nu2, resid.operator.norm.bound) {
+QFBounds.ineq.lower <- function(eps, obs, evals, ncps, E_R, nu2, resid.op.norm.bd) {
 
   survival_func_est <- SurvivalFunc(q = c(obs-E_R-eps),
                                     lambda = evals,
                                     delta = ncps)
 
 
-  F_H <- -survival_func_est - H(eps, nu2, resid.operator.norm.bound)
+  F_H <- -survival_func_est - H(eps, nu2, resid.op.norm.bd)
 
   # F_H <=-1 happens whenever CDF(a-eps)==0 and in other cases.
   # The if else statement below constrains optimization to the support of the truncated distribution
@@ -158,7 +182,7 @@ QFBounds.ineq.lower <- function(eps, obs, evals, ncps, E_R, nu2, resid.operator.
 }
 
 
-QFBounds.ineq.upper <- function(eps, obs, evals, ncps, E_R, nu2, resid.operator.norm.bound) {
+QFBounds.ineq.upper <- function(eps, obs, evals, ncps, E_R, nu2, resid.op.norm.bd) {
 
   survival_func_est <- SurvivalFunc(q = c(obs-E_R+eps),
                                     lambda = evals,
@@ -169,7 +193,7 @@ QFBounds.ineq.upper <- function(eps, obs, evals, ncps, E_R, nu2, resid.operator.
     survival_func_est <- -1
   }
 
-  F_H <- -survival_func_est + H(eps, nu2, resid.operator.norm.bound)
+  F_H <- -survival_func_est + H(eps, nu2, resid.op.norm.bd)
 
   # Upper can return upper bounds that correspond to values larger than one.  If these are found, then they are
   # caught later in QFBounds2
@@ -177,8 +201,8 @@ QFBounds.ineq.upper <- function(eps, obs, evals, ncps, E_R, nu2, resid.operator.
 }
 
 
-RemainderBoundSupportFinder <- function(eps, resid.operator.norm.bound, nu2) {
-  exp(0.5*nu2 / (abs(4*resid.operator.norm.bound)^2) - eps / abs(4*resid.operator.norm.bound)) - 1e-19
+RemainderBoundSupportFinder <- function(eps, resid.op.norm.bd, nu2) {
+  exp(0.5*nu2 / (abs(4*resid.op.norm.bd)^2) - eps / abs(4*resid.op.norm.bd)) - 1e-19
 }
 
 
@@ -217,8 +241,8 @@ SurvivalFunc <- function(q, lambda, delta, lim = 20000, acc = 1e-12) {
 }
 
 
-H <- function(eps, nu2, resid.operator.norm.bound) {
-  exp(ifelse(eps <= nu2 / (4*resid.operator.norm.bound),
+H <- function(eps, nu2, resid.op.norm.bd) {
+  exp(ifelse(eps <= nu2 / (4*resid.op.norm.bd),
              -0.5*(eps^2) / nu2,
-             0.5*nu2 / ((4*resid.operator.norm.bound)^2) - eps / (4*resid.operator.norm.bound)))
+             0.5*nu2 / ((4*resid.op.norm.bd)^2) - eps / (4*resid.op.norm.bd)))
 }
