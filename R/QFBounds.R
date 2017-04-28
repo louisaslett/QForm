@@ -48,7 +48,7 @@ QFBounds <- function(obs, M, mu, sigma, k = c(20), resid.op.norm.bd = NULL, lowe
     for(i in 1:length(obs)) {
       res <- rbind(res, c(k = k[kk],
                           obs = obs[i],
-                          QFBounds2(obs[i], eval.tilde[1:k[kk]], ncps[[kk]], E_R[[kk]], nu2[[kk]], N, resid.op.norm.bd, lower.tail, log)))
+                          QFBounds2(obs[i], eval.tilde[1:k[kk]], ncps[[kk]], E_R[[kk]], nu2[[kk]], N, resid.op.norm.bd, "missing", lower.tail, log)))
     }
   }
   res

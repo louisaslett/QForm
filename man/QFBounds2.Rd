@@ -5,7 +5,7 @@
 \title{Quadratic form bounds}
 \usage{
 QFBounds2(obs, evals, ncps, E_R, nu2, N, resid.op.norm.bd,
-  if.insufficient.eigs = "trivial", lower.tail = TRUE, log = FALSE)
+  if.insuff.eigs = "trivial", lower.tail = TRUE, log = FALSE)
 }
 \arguments{
 \item{obs}{scalar; the observed value of the quadratic form: that is, \eqn{y^T M y}.}
@@ -22,7 +22,7 @@ QFBounds2(obs, evals, ncps, E_R, nu2, N, resid.op.norm.bd,
 
 \item{resid.op.norm.bd}{description here}
 
-\item{if.insufficient.eigs}{string indicating what action to take if there are insufficient eigen-values to produce an accurate bound.  If \code{"trivial"} then the bounds \eqn{[0,1]} are returned; if \code{"missing"} then \code{NA} is returned for both bounds.}
+\item{if.insuff.eigs}{string indicating what action to take if there are insufficient eigen-values to produce an accurate bound.  If \code{"trivial"} then the bounds \eqn{[0,1]} are returned; if \code{"missing"} then \code{NA} is returned for both bounds.}
 
 \item{lower.tail}{logical; if \code{TRUE} (default), probability is \eqn{P(y^T M y \le obs)}, otherwise \eqn{P(y^T M y > obs)}}
 
