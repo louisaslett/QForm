@@ -1,4 +1,4 @@
-QFBounds <- function(obs, M, mu, sigma, k = c(20), resid_operator_norm_bound=NULL,lower.tail = TRUE, log = FALSE) {
+QFBounds <- function(obs, M, mu, sigma, k = c(20), resid.op.norm.bd = NULL, lower.tail = TRUE, log = FALSE) {
 
   # All input must be on the original scale.  obs= y^T M y
 
@@ -21,8 +21,10 @@ QFBounds <- function(obs, M, mu, sigma, k = c(20), resid_operator_norm_bound=NUL
   evec.tilde <- e$vectors[, order(abs(e$values), decreasing=TRUE)]
   eval.tilde <- e$values[order(abs(e$values), decreasing=TRUE)]
 
-  # Set resid_operator_norm_bound to magnitude of smallest truncated eigenvalue if not specified
-  if(is.null(resid_operator_norm_bound)){resid_operator_norm_bound <- abs(eval.tilde[length(eval.tilde)]) }
+  # Set resid.op.norm.bd to magnitude of smallest truncated eigenvalue if not specified
+  if(is.null(resid.op.norm.bd)) {
+    resid.op.norm.bd <- abs(eval.tilde[length(eval.tilde)])
+  }
 
   # Compute ncps
   ncps <- list()
@@ -46,7 +48,7 @@ QFBounds <- function(obs, M, mu, sigma, k = c(20), resid_operator_norm_bound=NUL
     for(i in 1:length(obs)) {
       res <- rbind(res, c(k = k[kk],
                           obs = obs[i],
-                          QFBounds2(obs[i], eval.tilde[1:k[kk]], ncps[[kk]], E_R[[kk]], nu2[[kk]], N,resid_operator_norm_bound, lower.tail, log)))
+                          QFBounds2(obs[i], eval.tilde[1:k[kk]], ncps[[kk]], E_R[[kk]], nu2[[kk]], N, resid.op.norm.bd, lower.tail, log)))
     }
   }
   res
