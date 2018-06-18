@@ -1,4 +1,6 @@
-QFIntBounds <- function(obs, M, mu, sigma, k = c(20), resid.op.norm.bd = NULL, lower.tail = TRUE, log = FALSE) {
+QFIntBounds <- function(obs, M, mu, sigma, k = c(20), resid.op.norm.bd = NULL, log = FALSE) {
+
+  require(RSpectra)
 
   # All input must be on the original scale.  obs= y^T M y
 
@@ -16,6 +18,8 @@ QFIntBounds <- function(obs, M, mu, sigma, k = c(20), resid.op.norm.bd = NULL, l
 
   # Eigen-decompose and rescale M by N in order to keep magnitude of observations in a more maneagable range
   M.tilde <- sweep(M * sigma, 2, sigma, "*")/N
+  # The observation vector is rescaled further down
+
   mu.tilde <- mu/sigma
   e <- eigs(M.tilde, max(k), which = "LM")
   evec.tilde <- e$vectors[, order(abs(e$values), decreasing=TRUE)]
@@ -48,7 +52,7 @@ QFIntBounds <- function(obs, M, mu, sigma, k = c(20), resid.op.norm.bd = NULL, l
     for(i in 1:length(obs)) {
       res <- rbind(res, c(k = k[kk],
                           obs = obs[i],
-                          QFBounds2(obs[i], eval.tilde[1:k[kk]], ncps[[kk]], E_R[[kk]], nu[[kk]], N, resid.op.norm.bd, "missing", lower.tail, log)))
+                          QFIntBounds2(obs[i]/N, eval.tilde[1:k[kk]], ncps[[kk]], E_R[[kk]], nu[[kk]], resid.op.norm.bd, log)))
     }
   }
   res

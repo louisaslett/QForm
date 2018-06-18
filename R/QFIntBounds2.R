@@ -22,34 +22,38 @@
 #' @examples
 #' # Some code here which runs a self-contained example
 #'
-QFIntBounds2 <- function(obs, evals, ncps, E_R, nu, N, resid.op.norm.bd, if.insuff.eigs = "trivial", lower.tail = TRUE, log = FALSE) {
+QFIntBounds2 <- function(obs, evals, ncps, E_R, nu, resid.op.norm.bd,log) {
 
-  integrate(QFIntBounds.ineq, lower=0, upper=Inf,obs=obs, evals=evals, ncps=ncps, E_R=E_R, nu=nu, resid.op.norm.bd,is.upper=T)
+  require(CompQuadForm)
 
-  integrate(QFIntBounds.ineq, lower=0, upper=Inf,obs=obs, evals=evals, ncps=ncps, E_R=E_R, nu=nu, resid.op.norm.bd,is.upper=F)
+  #browser()
 
+  upper<-integrate(QFIntBounds.ineq, lower=0, upper=Inf,obs=obs, evals=evals, ncps=ncps, E_R=E_R, nu=nu, resid.op.norm.bd,upper.bound=T)$value
+
+  lower<-integrate(QFIntBounds.ineq, lower=0, upper=Inf,obs=obs, evals=evals, ncps=ncps, E_R=E_R, nu=nu, resid.op.norm.bd,upper.bound=F)$value
+  if(log==T){return(c(log(lower),log(upper)))}else{return(c(lower,upper))}
 
   # TRANSFORM OUTPUT AS REQUIRED
 
-  if(lower.tail) {
-    return(data.frame(lower = ifelse(log, lower, exp(lower)),
-                      upper = ifelse(log, upper, exp(upper))))
-  } else {
-    return(data.frame(lower = ifelse(log, log(-expm1(upper)), -expm1(upper)),
-                      upper = ifelse(log, log(-expm1(lower)), -expm1(lower))))
-  }
+  # if(lower.tail) {
+  #   return(data.frame(lower = ifelse(log, lower, exp(lower)),
+  #                     upper = ifelse(log, upper, exp(upper))))
+  # } else {
+  #   return(data.frame(lower = ifelse(log, log(-expm1(upper)), -expm1(upper)),
+  #                     upper = ifelse(log, log(-expm1(lower)), -expm1(lower))))
+  # }
 }
 
 
 
-H<- function(z, nu, resid.op.norm.bd) {
+HInt<- function(z, nu, resid.op.norm.bd) {
   ifelse(z <= nu / (4*resid.op.norm.bd),
          (z/nu)*exp(-0.5*(z^2)/ nu),exp(nu/(32*resid.op.norm.bd^2)-z/(4*resid.op.norm.bd))/(4*resid.op.norm.bd))
 }
 
-QFIntBounds.ineq<- function(z,obs, evals, ncps, E_R, nu, resid.op.norm.bd,is.upper=T) {
-  side_indicator<-2*as.integer(upper)-1
-  return(H(z)*(1-davies(q=obs-E_R+ side_indicator*z,lambda=evals,delta=ncps,lim = 20000, acc = 1e-12)))
+QFIntBounds.ineq<- function(z,obs, evals, ncps, E_R, nu, resid.op.norm.bd,upper.bound=T) {
+  side_indicator<-2*as.integer(upper.bound)-1
+  return(HInt(z,nu,resid.op.norm.bd)-HInt(z,nu,resid.op.norm.bd)*davies(q=obs-E_R+ side_indicator*z,lambda=evals,delta=ncps,lim = 20000, acc = 1e-12)$Qq)
 }
 
 
