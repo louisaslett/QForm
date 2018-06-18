@@ -7,7 +7,7 @@ using namespace Rcpp;
 
 // machine_eps
 double machine_eps(double value);
-RcppExport SEXP QForm_machine_eps(SEXP valueSEXP) {
+RcppExport SEXP _QForm_machine_eps(SEXP valueSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -15,4 +15,14 @@ BEGIN_RCPP
     rcpp_result_gen = Rcpp::wrap(machine_eps(value));
     return rcpp_result_gen;
 END_RCPP
+}
+
+static const R_CallMethodDef CallEntries[] = {
+    {"_QForm_machine_eps", (DL_FUNC) &_QForm_machine_eps, 1},
+    {NULL, NULL, 0}
+};
+
+RcppExport void R_init_QForm(DllInfo *dll) {
+    R_registerRoutines(dll, NULL, CallEntries, NULL, NULL);
+    R_useDynamicSymbols(dll, FALSE);
 }

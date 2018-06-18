@@ -246,3 +246,4 @@ H <- function(eps, nu2, resid.op.norm.bd) {
              -0.5*(eps^2) / nu2,
              0.5*nu2 / ((4*resid.op.norm.bd)^2) - eps / (4*resid.op.norm.bd)))
 }
+

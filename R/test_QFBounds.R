@@ -1,4 +1,4 @@
-#load("~/Documents/lab/thesis/Chapter3/chapter3_R_code/ABO_kenya_min_mat_concentration_bound_demonstration_workspace.RData")
+load("~/Documents/lab/thesis/Chapter3/chapter3_R_code/ABO_kenya_min_mat_concentration_bound_demonstration_workspace.RData")
 # # #
 # # # # Everything is input on original scale, y^TBy.
 # #
@@ -9,12 +9,53 @@
 # # points(out$obs,out$upper,col="red",type="l")
 # # points(out$obs,out$lower,col="blue",type="l")
 # #
-# xx<-seq(-10e5,10e5,by=10000)
-# yy<- -log(ecdf(N*true_samps)(xx))/log(10)
-# out<-QFBounds(xx,abo_min_mat,2*p-1,2*sqrt(p*(1-p)),25,log=T)
-# plot(xx,yy,type="l",ylim=c(0,13),xlab="observed quad form",ylab="-log_10 CDF")
-# points(out$obs,-out$upper/log(10),col="red",type="l")
-# points(out$obs,-out$lower/log(10),col="blue",type="l")
+xx<-seq(-10e5,10e5,by=10000)
+N
+out<-QFBounds(xx,abo_min_mat,2*p-1,2*sqrt(p*(1-p)),25,log=T)
+
+enveloper<-function(v,se,log10_tail_prob=9){
+  z_quantile<-abs(qnorm(0.5*10^(-log10_tail_prob)))
+  upper<-v+z_quantile*se
+  upper[upper>1]<-1
+  lower<-v-z_quantile*se
+  lower[lower<0]<-0
+  return(list("upper"=upper,"lower"=lower))
+}
+
+
+
+yy<- -log(ecdf(N*true_samps)(xx))/log(10)
+plot(xx,yy,type="l",ylim=c(0,13),xlab="observed quad form",ylab="-log_10 CDF")
+points(out$obs,-out$upper/log(10),col="red",type="l")
+points(out$obs,-out$lower/log(10),col="blue",type="l")
+
+plot(xx,-out$upper/log(10)-yy,type="l",xlab="observed quad form",ylab="-log_10 CDF")
+abline(0,0)
+points(xx,-out$lower/log(10)-yy,type="l",xlab="observed quad form",ylab="-log_10 CDF")
+abline(0,0)
+
+
+
+yy<- -log(1-ecdf(N*true_samps)(xx))/log(10)
+plot(xx,yy,type="l",ylim=c(0,13),xlab="observed quad form",ylab="-log_10 CDF")
+points(out$obs,-log(1-exp(out$upper))/log(10),col="red",type="l")
+points(out$obs,-log(1-exp(out$lower))/log(10),col="blue",type="l")
+
+
+plot(xx,-log(1-exp(out$upper))/log(10)-yy,type="l",xlab="observed quad form",ylab="-log_10 CDF")
+points(out$obs,,col="red",type="l")
+points(out$obs,-log(1-exp(out$lower))/log(10),col="blue",type="l")
+
+
+
+
+
+plot(xx,yy,type="l",ylim=c(0,13),xlab="observed quad form",ylab="-log_10 CDF")
+points(out$obs,-out$upper/log(10),col="red",type="l")
+points(out$obs,-out$lower/log(10),col="blue",type="l")
+
+
+
 
 # # QFBounds(xx,abo_min_mat,2*p-1,2*sqrt(p*(1-p)),25,log=T)
 # #
