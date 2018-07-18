@@ -4,7 +4,7 @@
 \alias{QFBounds2}
 \title{Quadratic form bounds}
 \usage{
-QFBounds2(obs, evals, ncps, E_R, nu2, N, resid.op.norm.bd,
+QFBounds2(obs, evals, ncps, E_R, nu, N, resid.op.norm.bd,
   if.insuff.eigs = "trivial", lower.tail = TRUE, log = FALSE)
 }
 \arguments{
@@ -16,7 +16,7 @@ QFBounds2(obs, evals, ncps, E_R, nu2, N, resid.op.norm.bd,
 
 \item{E_R}{description here}
 
-\item{nu2}{description here}
+\item{nu}{description here}
 
 \item{N}{description here}
 

@@ -13,10 +13,16 @@ QFBounds <- function(obs, M, mu, sigma, k = c(20), resid.op.norm.bd = NULL, lowe
   }
   # obs <- suppressMessages(as.numeric(crossprod(crossprod(M, y), y)))
   N <- nrow(M)
+  if(!is.vector(sigma) || length(sigma) != N) {
+    stop("sigma must be a vector matching the number of rows of M.")
+  }
+  if(!is.vector(mu) || length(mu) != N) {
+    stop("mu must be a vector matching the number of rows of M.")
+  }
 
   # Eigen-decompose
-  M.tilde <- sweep(M * sigma, 2, sigma, "*")
   mu.tilde <- mu/sigma
+  M.tilde <- sweep(M * sigma, 2, sigma, "*")
   e <- eigs(M.tilde, max(k), which = "LM")
   evec.tilde <- e$vectors[, order(abs(e$values), decreasing=TRUE)]
   eval.tilde <- e$values[order(abs(e$values), decreasing=TRUE)]
@@ -34,11 +40,11 @@ QFBounds <- function(obs, M, mu, sigma, k = c(20), resid.op.norm.bd = NULL, lowe
   }
 
   # nu and E
-  nu2 <- list()
+  nu <- list()
   E_R <- list()
   for(kk in 1:length(k)) {
     R <- (M.tilde - evec.tilde[,1:k[kk]] %*% (t(evec.tilde[,1:k[kk]]) * eval.tilde[1:k[kk]]))
-    nu2[[kk]] <- 8 * sum((R %*% mu.tilde)^2) + 4 * sum(R^2)
+    nu[[kk]] <- 8 * sum((R %*% mu.tilde)^2) + 4 * sum(R^2)
     E_R[[kk]] <- as.numeric(mu.tilde %*% R %*% mu.tilde + sum(diag(R)))
   }
 
@@ -48,7 +54,7 @@ QFBounds <- function(obs, M, mu, sigma, k = c(20), resid.op.norm.bd = NULL, lowe
     for(i in 1:length(obs)) {
       res <- rbind(res, c(k = k[kk],
                           obs = obs[i],
-                          QFBounds2(obs[i], eval.tilde[1:k[kk]], ncps[[kk]], E_R[[kk]], nu2[[kk]], N, resid.op.norm.bd, "missing", lower.tail, log)))
+                          QFBounds2(obs[i], eval.tilde[1:k[kk]], ncps[[kk]], E_R[[kk]], nu[[kk]], N, resid.op.norm.bd, "missing", lower.tail, log)))
     }
   }
   res

@@ -10,7 +10,7 @@
 #' @param evals vector of eigen-values of the matrix \eqn{M}.  These need not be all eigen values.
 #' @param ncps description here
 #' @param E_R description here
-#' @param nu2 description here
+#' @param nu description here
 #' @param N description here
 #' @param resid.op.norm.bd description here
 #' @param if.insuff.eigs string indicating what action to take if there are insufficient eigen-values to produce an accurate bound.  If \code{"trivial"} then the bounds \eqn{[0,1]} are returned; if \code{"missing"} then \code{NA} is returned for both bounds.
@@ -22,7 +22,7 @@
 #' @examples
 #' # Some code here which runs a self-contained example
 #'
-QFBounds2 <- function(obs, evals, ncps, E_R, nu2, N, resid.op.norm.bd, if.insuff.eigs = "trivial", lower.tail = TRUE, log = FALSE) {
+QFBounds2 <- function(obs, evals, ncps, E_R, nu, N, resid.op.norm.bd, if.insuff.eigs = "trivial", lower.tail = TRUE, log = FALSE) {
 
   # PRELIMINARY CALCULATIONS
 
@@ -34,14 +34,14 @@ QFBounds2 <- function(obs, evals, ncps, E_R, nu2, N, resid.op.norm.bd, if.insuff
   # Rescale by N to keep calculations within a range of reasonable precision
   obs <- obs/N
   E_R <- E_R/N
-  nu2 <- nu2/(N^2)
+  nu <- nu/(N^2)
   evals <- evals/N
   resid.op.norm.bd <- resid.op.norm.bd/N
 
   # Calculate the mean and variance of the truncated part of the quadratic form
   # E_T <- sum(evals*(1+ncps))
   Var_T <- 2*sum((evals^2)*(1+2*ncps))
-  Var_R <- nu2/2
+  Var_R <- nu/2
 
   # Find the machine precision we care about (the precision at which we could detect
   # changes in our objective funtion duing optimization)
@@ -97,9 +97,9 @@ QFBounds2 <- function(obs, evals, ncps, E_R, nu2, N, resid.op.norm.bd, if.insuff
   if(OK_to_optimize) {
     # Find search interval:
     int_right <- uniroot(f = RemainderBoundSupportFinder,
-                         interval = c(nu2/(4*resid.op.norm.bd), sqrt(Var_R)*100),
+                         interval = c(nu/(4*resid.op.norm.bd), sqrt(Var_R)*100),
                          resid.op.norm.bd = resid.op.norm.bd,
-                         nu2 = nu2,
+                         nu = nu,
                          extendInt = "downX",
                          tol = 1e-20)$root
 
@@ -112,7 +112,7 @@ QFBounds2 <- function(obs, evals, ncps, E_R, nu2, N, resid.op.norm.bd, if.insuff
                                  evals = evals,
                                  ncps = ncps,
                                  E_R = E_R,
-                                 nu2 = nu2,
+                                 nu = nu,
                                  resid.op.norm.bd = resid.op.norm.bd,
                                  maximum = TRUE,
                                  tol = opt_tol)$objective)
@@ -123,7 +123,7 @@ QFBounds2 <- function(obs, evals, ncps, E_R, nu2, N, resid.op.norm.bd, if.insuff
                                  evals = evals,
                                  ncps = ncps,
                                  E_R = E_R,
-                                 nu2 = nu2,
+                                 nu = nu,
                                  resid.op.norm.bd = resid.op.norm.bd,
                                  maximum = FALSE,
                                  tol = opt_tol)$objective)
@@ -162,14 +162,14 @@ QFBounds2 <- function(obs, evals, ncps, E_R, nu2, N, resid.op.norm.bd, if.insuff
 }
 
 
-QFBounds.ineq.lower <- function(eps, obs, evals, ncps, E_R, nu2, resid.op.norm.bd) {
+QFBounds.ineq.lower <- function(eps, obs, evals, ncps, E_R, nu, resid.op.norm.bd) {
 
   survival_func_est <- SurvivalFunc(q = c(obs-E_R-eps),
                                     lambda = evals,
                                     delta = ncps)
 
 
-  F_H <- -survival_func_est - H(eps, nu2, resid.op.norm.bd)
+  F_H <- -survival_func_est - H(eps, nu, resid.op.norm.bd)
 
   # F_H <=-1 happens whenever CDF(a-eps)==0 and in other cases.
   # The if else statement below constrains optimization to the support of the truncated distribution
@@ -182,7 +182,7 @@ QFBounds.ineq.lower <- function(eps, obs, evals, ncps, E_R, nu2, resid.op.norm.b
 }
 
 
-QFBounds.ineq.upper <- function(eps, obs, evals, ncps, E_R, nu2, resid.op.norm.bd) {
+QFBounds.ineq.upper <- function(eps, obs, evals, ncps, E_R, nu, resid.op.norm.bd) {
 
   survival_func_est <- SurvivalFunc(q = c(obs-E_R+eps),
                                     lambda = evals,
@@ -193,7 +193,7 @@ QFBounds.ineq.upper <- function(eps, obs, evals, ncps, E_R, nu2, resid.op.norm.b
     survival_func_est <- -1
   }
 
-  F_H <- -survival_func_est + H(eps, nu2, resid.op.norm.bd)
+  F_H <- -survival_func_est + H(eps, nu, resid.op.norm.bd)
 
   # Upper can return upper bounds that correspond to values larger than one.  If these are found, then they are
   # caught later in QFBounds2
@@ -201,8 +201,8 @@ QFBounds.ineq.upper <- function(eps, obs, evals, ncps, E_R, nu2, resid.op.norm.b
 }
 
 
-RemainderBoundSupportFinder <- function(eps, resid.op.norm.bd, nu2) {
-  exp(0.5*nu2 / (abs(4*resid.op.norm.bd)^2) - eps / abs(4*resid.op.norm.bd)) - 1e-19
+RemainderBoundSupportFinder <- function(eps, resid.op.norm.bd, nu) {
+  exp(0.5*nu / (abs(4*resid.op.norm.bd)^2) - eps / abs(4*resid.op.norm.bd)) - 1e-19
 }
 
 
@@ -241,9 +241,8 @@ SurvivalFunc <- function(q, lambda, delta, lim = 20000, acc = 1e-12) {
 }
 
 
-H <- function(eps, nu2, resid.op.norm.bd) {
-  exp(ifelse(eps <= nu2 / (4*resid.op.norm.bd),
-             -0.5*(eps^2) / nu2,
-             0.5*nu2 / ((4*resid.op.norm.bd)^2) - eps / (4*resid.op.norm.bd)))
+H <- function(eps, nu, resid.op.norm.bd) {
+  exp(ifelse(eps <= nu / (4*resid.op.norm.bd),
+             -0.5*(eps^2) / nu,
+             0.5*nu / ((4*resid.op.norm.bd)^2) - eps / (4*resid.op.norm.bd)))
 }
-
