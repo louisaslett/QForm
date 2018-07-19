@@ -117,10 +117,10 @@ SurvivalFuncInt <- function(q, lambda, delta, lim = 20000, acc = 1e-12) {
 
 QFIntBounds.ineq <- function(z, obs, evals, ncps, E_R, nu, resid.op.norm.bd, upper.bound = TRUE) {
   side_indicator <- 2*as.integer(upper.bound)-1
-  HInt(z,nu,resid.op.norm.bd) -
-    HInt(z,nu,resid.op.norm.bd) *
-    SurvivalFuncInt(q = obs-E_R+ side_indicator*z,
-                    lambda = evals,
+
+  HInt(z,nu,resid.op.norm.bd) *
+    SurvivalFuncInt(q = -obs + E_R - side_indicator*z,
+                    lambda = -evals,
                     delta = ncps,
                     lim = 20000,
                     acc = 1e-12)
