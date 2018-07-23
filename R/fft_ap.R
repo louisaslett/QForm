@@ -70,3 +70,35 @@ fft.ap <- function(z) {
   }
   x
 }
+
+fft.ap2 <- function(z) {
+  N <- nrow(z)
+  n.stages <- log2(N)
+  if(!(n.stages %in% which(lapply(twiddle.table, length)>0))) {
+    stop("z must be 2^16 thru 2^19 long")
+  }
+
+  tt <- twiddle.table[[n.stages]]
+
+  new.i <- bitrevorder(N)
+  x <- z
+  x.res <- mpfr(matrix(0, nrow = nrow(x), ncol = ncol(x)), acc)
+
+  for(p in 1:n.stages) {
+    alpha <- 2^(p-1)
+    bf.start <- 1
+    while(bf.start <= (N-alpha)) {
+      for(ibf.idx in 0:(alpha-1)) {
+        x.res[bf.start,]         <- x[bf.start,, drop = FALSE] + c.mul(x[bf.start+alpha,, drop = FALSE], tt[ibf.idx*2^(n.stages - p) + 1,, drop = FALSE])
+        x.res[bf.start + alpha,] <- x[bf.start,, drop = FALSE] - c.mul(x[bf.start+alpha,, drop = FALSE], tt[ibf.idx*2^(n.stages - p) + 1,, drop = FALSE])
+        # cat(glue("bf.start = {bf.start}, alpha = {alpha}\n{as.double(x.res[bf.start,])}\n{as.double(x.res[bf.start + alpha,])} \n \n"))
+        bf.start <- bf.start + 1
+        if(ibf.idx == alpha-1) {
+          bf.start <- bf.start + alpha
+        }
+      }
+    }
+    x <- x.res
+  }
+  x
+}
