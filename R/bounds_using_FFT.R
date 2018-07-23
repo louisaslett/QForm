@@ -19,7 +19,7 @@ ncps<-1:length(lambda)
 
 a<- -1000000
 b<- 1000000
-n<-2^10
+n<-2^16
 # There appears to be a limit...the relative error with respect to davies doesn't improve with increasing n.
 log.phi<-function(t,lambda,ncps){
   sum(complex(imaginary=ncps*t*lambda)/complex(real=1, imaginary=-2*t*lambda) - 0.5*log(complex(real=1,imaginary=-2*t*lambda)))

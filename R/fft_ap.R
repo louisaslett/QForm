@@ -24,6 +24,10 @@ c.log <- function(z) {
            c.atan2(z[,2], z[,1])), nrow = nrow(z), ncol = 2)
 }
 
+c.exp <- function(z) {
+  matrix(c(cos(z[,2]), sin(z[,2]))*exp(z[,1]), nrow = nrow(z), ncol = 2)
+}
+
 bitrevorder <- function(i) {
   nonzeros <- max(which(intToBits(i)>0))-1
   sapply(0:(i-1), function(x, nonzeros) {
@@ -81,10 +85,11 @@ fft.ap2 <- function(z) {
   tt <- twiddle.table[[n.stages]]
 
   new.i <- bitrevorder(N)
-  x <- z
+  x <- z[new.i,]
   x.res <- mpfr(matrix(0, nrow = nrow(x), ncol = ncol(x)), acc)
 
   for(p in 1:n.stages) {
+    print(p)
     alpha <- 2^(p-1)
     bf.start <- 1
     while(bf.start <= (N-alpha)) {

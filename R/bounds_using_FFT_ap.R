@@ -27,9 +27,9 @@ log.phi.ap<-function(t,lambda,ncps){
 rho.ap<-mpfr(matrix(0,nrow=n.forR,ncol=2),acc)
 require(foreach)
 require(doMC)
-registerDoMC(cores = 4)
+registerDoMC(cores = 8)
 
-rho.ap<-foreach(k = 1:n.forR,.combine=rbind) %dopar% exp(log.phi.ap((Const("pi",acc)*n/(b-a))*(2*((k-1)/n)-1), lambda, ncps) - matrix(c(mpfr(0,acc),Const("pi",acc)*a*(n/(b-a))*(2*((k-1)/n)-1)),ncol=2))
+rho.ap<-foreach(k = 1:n.forR,.combine=rbind,.multicombine = TRUE, .maxcombine = 10000) %dopar% c.exp(log.phi.ap((Const("pi",acc)*n/(b-a))*(2*((k-1)/n)-1), lambda, ncps) - matrix(c(mpfr(0,acc),Const("pi",acc)*a*(n/(b-a))*(2*((k-1)/n)-1)),ncol=2))
 
 rho<-complex(real=as.double(rho.ap[,1]),imaginary=as.double(rho.ap[,2]))
 
@@ -38,10 +38,11 @@ complex(imaginary = pi*a*(n/(b-a))*(2*((k-1)/n)-1))
 xx<-seq(a,b-(b-a)/n.forR,length.out = n.forR)
 
 plot(xx,-log10(rho.ap[,1]),type="l")
+points(xx,-log10(Re(rho)),type="l", col="red")
 
-ans<-Re(fft(rho)*(-1)^(0:(n-1))/(b-a))
+ans<-Re(fft(rho)*(-1)^(0:(n.forR-1))/as.numeric(b-a))
 
-ans2<-fft.ap(rho)[,1]*(-1)^(0:(n-1))/(b-a)
+ans2<-fft.ap2(rho.ap)[,1]*(-1)^(0:(n-1))/(b-a)
 
 plot(xx,-log10(ans),type="l")
 lines(xx,-log10(ans2),col="red")
