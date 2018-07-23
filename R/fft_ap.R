@@ -12,6 +12,18 @@ for(pwr in c(5,16)) {
   twiddle.table[[pwr]][,2] <- sin(twiddle.table[[pwr]][,2])
 }
 
+c.atan2 <- function(y, x) {
+  res <- 2*atan(y/(x+sqrt(x^2+y^2)))
+  if(any(y==0))
+    res[y==0] <- Const("pi", acc)
+  res
+}
+
+c.log <- function(z) {
+  matrix(c(log(sqrt(z[,1]^2+z[,2]^2)),
+           c.atan2(z[,2], z[,1])), nrow = nrow(z), ncol = 2)
+}
+
 bitrevorder <- function(i) {
   nonzeros <- max(which(intToBits(i)>0))-1
   sapply(0:(i-1), function(x, nonzeros) {
