@@ -1,4 +1,4 @@
-QFIntBounds <- function(obs, M, mu, sigma, k = c(20), resid.op.norm.bd = NULL, lower.tail = TRUE, log = FALSE) {
+QFIntBounds <- function(obs, M, mu, sigma, k = c(20), resid.op.norm.bd = NULL, lower.tail = TRUE, log = FALSE, llin.approx = FALSE) {
 
   # All input must be on the original scale.  obs= y^T M y
 
@@ -50,15 +50,20 @@ QFIntBounds <- function(obs, M, mu, sigma, k = c(20), resid.op.norm.bd = NULL, l
   }
 
   # Call complex function
-  res <- data.frame(k = c(), obs = c(), lower = c(), upper = c())
+  if(llin.approx)
+    llin.approx <- new.env(parent = emptyenv())
+  res <- data.frame(k = c(), obs = c(), lower = c(), upper = c(), llin.approx = c())
   for(kk in 1:length(k)) {
     for(i in 1:length(obs)) {
       res <- rbind(res, c(k = k[kk],
                           obs = obs[i],
-                          QFIntBounds2(obs[i]/N, eval.tilde[1:k[kk]], ncps[[kk]], E_R[[kk]], nu[[kk]], resid.op.norm.bd, lower.tail, log)))
+                          QFIntBounds2(obs[i]/N, eval.tilde[1:k[kk]], ncps[[kk]], E_R[[kk]], nu[[kk]], resid.op.norm.bd, lower.tail, log, llin.approx)))
     }
   }
-  res
+  if(is.environment(llin.approx)) {
+    return(res)
+  }
+  res[,-5]
 }
 
 QFIntBounds.ryan <- function(obs, M, mu, sigma, k = c(20), resid.op.norm.bd = NULL, log = FALSE) {

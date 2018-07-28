@@ -5,7 +5,7 @@
 \title{Quadratic form bounds}
 \usage{
 QFIntBounds2(obs, evals, ncps, E_R, nu, resid.op.norm.bd, lower.tail = TRUE,
-  log = FALSE)
+  log = FALSE, llin.approx = FALSE)
 }
 \arguments{
 \item{obs}{scalar; the observed value of the quadratic form: that is, \eqn{y^T M y}.}
