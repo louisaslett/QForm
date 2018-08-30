@@ -16,6 +16,9 @@ Imports: CompQuadForm,
   Rcpp (>= 0.12.9),
   RSpectra,
   stats,
-  glue
-LinkingTo: Rcpp
-RoxygenNote: 6.0.1
+  glue,
+  RcppEigen,
+  BH,
+  RcppRoll
+LinkingTo: Rcpp, Rmpfr, RcppEigen, BH
+RoxygenNote: 6.1.0
