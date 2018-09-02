@@ -123,8 +123,8 @@ Tpdf <- function(evals, ncps, n = 2^17, neg.log = FALSE, num.baseline.intervals 
   b.r <- b.r/SD.max
   b.l <- b.l/SD.max
 
-  a.r <- ans2[best.r]-xx[best.r]*b.r
-  a.l <- ans2[best.l]-xx[best.l]*b.l
+  a.r <- ans2[best.r]-xx[best.r]*b.r+log(SD.max)
+  a.l <- ans2[best.l]-xx[best.l]*b.l+log(SD.max)
 
 
   # Change results if the support of the distribution is the positive or negative real line
@@ -165,8 +165,11 @@ Tpdf <- function(evals, ncps, n = 2^17, neg.log = FALSE, num.baseline.intervals 
   # RC: might want to change best.l and best.r to be the outer rather than inner points of the extrapolation interval
   # in order to guarantee that the extrapolated line is in fact below the -log density even over the span of the extrapolation interval
   #
+
+
   list("x" = xx,
-       "d" = if(neg.log==T) { ans2 } else { ans },
+       "d" = if(neg.log==T) { ans2+log(SD.max) } else { ans/SD.max },
+       "interval.width"=(b-a)/n,
        "limit.l" = limit.l,
        "index.l" = best.l,
        "index.r" = best.r,
