@@ -58,12 +58,15 @@ extrapolate_tail<-function(log.cdf,xx.standardized,start,best,num.windows,right.
   interval.length<-ifelse(right.side,floor(2*(which.max(log.cdf>-log(1e-5))-start)/(num.windows+1)),
                           -floor(2*(which.max(-log.cdf>log(1e-5))-1-start)/(num.windows+1)))
 
-  if(interval.length<10){warning(paste("Too few evaluation points in the", side,"tail to make reliable extrapolation: result returned.  Try increasing the number of CDF domain grid points n (optional argument)",sep=""))}
+  if(interval.length<10){warning(paste("Too few evaluation points in the",
+                                       ifelse(right.side,"right","left"),"tail to make reliable extrapolation: result returned.
+                                       Try increasing the number of CDF domain grid points n (optional argument)",sep=" "))}
 
   if(interval.length<4){
-    warning(paste("Too few evaluation points in the", side,"tail to extrapolate: NAs returned for extrapolation.  Try increasing the number of CDF domain grid points n (optional argument)",sep=""))
+    warning(paste("Too few evaluation points in the", ifelse(right.side,"right","left"),"tail to extrapolate: NAs returned for extrapolation.
+                  Try increasing the number of CDF domain grid points n (optional argument)",sep=" "))
     return(list("b" = NA,"best" = NA,"successful"=F))
-    }
+  }
 
 
   r2 <- calc.R2(log.cdf[start:best], xx.standardized[start:best], interval.length)
@@ -79,7 +82,8 @@ extrapolate_tail<-function(log.cdf,xx.standardized,start,best,num.windows,right.
 
 # This finds cdf for Y.s - mu.s where Y = \sum_i evals.s_i * (Z_i + \delta_i)^2
 log.rho.Q.easy.centered<-function(t,evals.s,ncps,a,mu.s){
-  complex(imaginary = -t*(a+mu.s))+sum( complex(imaginary=ncps*t*evals.s)/complex(real=1,imaginary=-2*t*evals.s) - 0.5*log(complex(real=1,imaginary=-2*t*evals.s))  )
+  complex(imaginary = -t*(a+mu.s))+sum( complex(imaginary=ncps*t*evals.s)/complex(real=1,imaginary=-2*t*evals.s)
+                                        - 0.5*log(complex(real=1,imaginary=-2*t*evals.s))  )
 }
 
 
@@ -91,12 +95,30 @@ Tcdf2 <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, qfft.apply = sap
   # Sanity Checks
   ####################
 
+  if(!(is.integer(evals) | is.numeric(evals))){stop("evals must be integer or numeric")}
+  evals <- as.numeric(evals)
+
+  if(!(is.integer(ncps) | is.numeric(ncps))){stop("ncps must be integer or numeric")}
+  ncps <- as.numeric(ncps)
+
   if(length(evals)!=length(ncps)){stop("length of evals does not equal length of ncps")}
 
-  # Set Up
+  if(any(ncps<0)){stop("ncps must be non-negative.")}
+
+  if(all(evals==0)){stop("All evals are 0.")}
+  if(any(evals==0)){
+    evals <- evals[which(evals!=0)]
+    ncps <- ncps[which(evals!=0)]
+  }
+
+  if(length(unique(evals))==1){warning("All of the eigenvalues are the same.
+                                       Proceeding to result but consider using pchisq instead.")}
+
+
+  # Determine Rescaling and Centering for Numerical Stability
+  # We center the distribution but standardize by the component with the largest variance, not the total variance
   #########################
 
-  # Standardize by the component with the largest variance
   mu <- sum((ncps+1)*evals)
   v <- 2*(1+2*ncps)*(evals^2)
   sigma <- sqrt(sum(v))
@@ -111,44 +133,44 @@ Tcdf2 <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, qfft.apply = sap
 
   esrange<-range(evals.s) # these eigenvalues are not centered
 
-  b.standardized <- uniroot(function(z,nu,resid.op.norm.bd,bound) {
-    # This is our concentration inequality
-    ifelse(z <= nu / (4*resid.op.norm.bd),
-           0.5*(z^2) / nu,
-           z / (4*resid.op.norm.bd) - 0.5*nu / ((4*resid.op.norm.bd)^2) ) / log(10) - bound
-  }, lower = 0, upper = 1e3*sigma/s,tol = .Machine$double.eps,
-  nu = 8*sum(ncps*(evals.s^2))+4*sum(evals.s^2), resid.op.norm.bd = esrange[2], bound = 17,
-  extendInt = "upX")$root
+  if(esrange[2]>0){
+    b.standardized <- uniroot(function(z,nu,resid.op.norm.bd,bound) {
+      # This is our concentration inequality
+      ifelse(z <= nu / (4*resid.op.norm.bd),
+             0.5*(z^2) / nu,
+             z / (4*resid.op.norm.bd) - 0.5*nu / ((4*resid.op.norm.bd)^2) ) / log(10) - bound
+    }, lower = 0, upper = 1e3*sigma/s,tol = .Machine$double.eps,
+    nu = 8*sum(ncps*(evals.s^2))+4*sum(evals.s^2), resid.op.norm.bd = esrange[2], bound = 17,
+    extendInt = "upX")$root
 
-  if(esrange[2]<=0){ # All eigenvalues are zero or negative
-    b.standardized <- min(-mu.s,b.standardized) # If you know the CDF must stop at 0, then don't worry about evaluating past that
+  }else{
+    # If you know the CDF must stop at 0, then evaluate up to there on standardized, centered scale
+    b.standardized <- -mu.s
   }
 
-
-  a.standardized <- -uniroot(function(z,nu,resid.op.norm.bd,bound) {
-    # This function is negative log of H
-    ifelse(z <= nu / (4*resid.op.norm.bd),
-           0.5*(z^2) / nu,
-           z / (4*resid.op.norm.bd) - 0.5*nu / ((4*resid.op.norm.bd)^2) ) / log(10) - bound
-  }, lower = 0, upper = 1e3*sigma/s,tol = .Machine$double.eps,
-  nu = 8*sum(ncps*(evals.s^2))+4*sum(evals.s^2), resid.op.norm.bd = abs(esrange[1]), bound = 17,
-  extendInt = "upX")$root
-
-  if(esrange[1]>=0){ # All eigenvalues are zero or positive
-    a.standardized <- max(-mu.s,a.standardized) # If you know the CDF must stop at 0 (on this scale, mu.s), then don't worry about evaluating past that
+  if(esrange[1]<0){
+    a.standardized <- -uniroot(function(z,nu,resid.op.norm.bd,bound) {
+      # This function is negative log of H
+      ifelse(z <= nu / (4*resid.op.norm.bd),
+             0.5*(z^2) / nu,
+             z / (4*resid.op.norm.bd) - 0.5*nu / ((4*resid.op.norm.bd)^2) ) / log(10) - bound
+    }, lower = 0, upper = 1e3*sigma/s,tol = .Machine$double.eps,
+    nu = 8*sum(ncps*(evals.s^2))+4*sum(evals.s^2), resid.op.norm.bd = -esrange[1], bound = 17,
+    extendInt = "upX")$root
+  }else{
+    # If you know the CDF must stop at 0, then evaluate up to there on standardized, centered scale
+    a.standardized <- -mu.s
   }
 
-  # Evaluate Density
+  # Evaluate CDF using FFT
   ######################
 
   rho <- sapply(1:n, function(k, a.standardized, b.standardized, n, evals.s, ncps,mu.s) {
-    exp(log.rho.Q.easy.centered((pi*n/(b.standardized-a.standardized))*(2*((k-1)/n)-1), evals.s,ncps, a.standardized,mu.s)) / (pi*(2*((k-1)/n)-1))
+    exp(log.rho.Q.easy.centered((pi*n/(b.standardized-a.standardized))*(2*((k-1)/n)-1),
+                                evals.s,ncps, a.standardized,mu.s)) / (pi*(2*((k-1)/n)-1))
   }, a.standardized = a.standardized, b.standardized = b.standardized, n = n, evals.s = evals.s, ncps = ncps, mu.s = mu.s)
 
-
-  # Perform FFT
   fft_cdf <- 0.5 - (Im(fft(rho))*(-1)^(0:(n-1)))/n
-
 
   xx.standardized <- seq(a.standardized, b.standardized-(b.standardized-a.standardized)/n, length.out = n)
 
@@ -169,15 +191,15 @@ Tcdf2 <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, qfft.apply = sap
   }
 
 
-  # Find linear extrapolation points
-  ####################################
+  # Begin search for extrapolation points
+  ########################################
 
+  # Focus in on the tail
   ctstart.r <- which.max(fft_cdf>0.99)
   ctstart.l <- which.max(fft_cdf>0.01)-1
 
-  # First: Theoretically, the CDF should never hit 0 or 1...well depends on whether all the eigenvalues have the
-  # same sign.  In that case, just force the CDF to hit zero there and kill all points leading up to 0 that hit or are below it.
-  # best.l and best.r will be defined to be one point in from where the numerical instability starts
+  # First: Eliminate Parts of the Estimated CDF that deviate below 0 or above 1 (allowed to hit 0 or 1 at the
+  # last point if all of the eigenvalues have the same sign and the domain of the CDF has a bound on that side)
 
   if(esrange[2]<=0){ # All eigenvalues are zero or negative
     fft_cdf[n] <- 1
@@ -193,23 +215,28 @@ Tcdf2 <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, qfft.apply = sap
     l0 <- which( fft_cdf[1:ctstart.l]<=0 )
   }
 
-  best.r <- ifelse(length(r0)==0, n, ctstart.r-2+min(r0))
-  best.l <- ifelse(length(l0)==0, 1, max(l0)+1)
+  best.r <- ifelse(length(r0)==0, n, ctstart.r-2+min(r0)) # One point in from the trouble point
+  best.l <- ifelse(length(l0)==0, 1, max(l0)+1) # One point in from the trouble point
+
+
+  # Second: Eliminate points as unstable if/where the CDF stops being monotonic
 
   # Take -log density
   log.cdf.l <- suppressWarnings(-log(fft_cdf))
   log.cdf.r <- suppressWarnings(-log1p(-fft_cdf))
 
-  # Second: CDF should be monotonic
   rblips <- which(diff(log.cdf.r[ctstart.r:best.r]) < -sqrt(.Machine$double.eps))
   best.r <- ifelse(length(rblips)==0,best.r,ctstart.r-2+min(rblips))
+  # Again, we take the point one in from the trouble
   lblips <- which(diff(log.cdf.l[best.l:ctstart.l]) > sqrt(.Machine$double.eps))
   best.l <- ifelse(length(lblips)==0,best.l,best.l+max(lblips))
+  # Again, we take the point one in from the trouble
 
 
-  # Refine extrapolation points by cropping off the density when it starts becoming curvy due to numerical instability
+  # Finally: refine extrapolation points by cropping off the density when it starts becoming curvy due to numerical instability
 
-  if(esrange[1]>=0){ # All eigenvalues are zero or positive
+  # If all eigenvalues are zero or positive
+  if(esrange[1]>=0){
     limit.l <- 0
     limit.r <- Inf
     right.tail<-extrapolate_tail(log.cdf.r,xx.standardized,ctstart.r,best.r,num.windows=20,right.side=T)
@@ -218,32 +245,29 @@ Tcdf2 <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, qfft.apply = sap
       best.r<-right.tail$best
       b.r<-right.tail$b/s
       a.r <- log.cdf.r[best.r]-xx[best.r]*b.r
-      c.r <- 0
     }else{
-      c.r <- b.r <- a.r <- NA
+      b.r <- a.r <- NA
     }
 
-
     if( best.l != 1 ){
-      left.tail<-extrapolate_tail(log.cdf.l,xx.standardized,ctstart.l,best.l,num.windows=20,right.side=F)
+      left.tail<-extrapolate_tail(log.cdf.l,log(xx.standardized+mu.s),ctstart.l,best.l,num.windows=20,right.side=F)
 
       if(left.tail$successful){
         best.l<-left.tail$best
-        b.l<-left.tail$b/s
-        a.l <- log.cdf.l[best.l]-xx[best.l]*b.l
-        c.l <- -exp(-(a.l+b.l*(-mu.s)))
+        b.l<-left.tail$b
+        a.l <- log.cdf.l[best.l]-log(xx[best.l])*b.l
       }else{
-        c.l <- b.l <- a.l <- NA
+        b.l <- a.l <- NA
       }
 
     }else{
       b.l <- NULL
       a.l <- NULL
-      c.l <- NULL
     }
   }
 
-  if(esrange[2]<=0){ # All eigenvalues are zero or negative
+  # If all eigenvalues are zero or negative
+  if(esrange[2]<=0){
     limit.l <- Inf
     limit.r <- 0
     left.tail<-extrapolate_tail(log.cdf.l,xx.standardized,ctstart.l,best.l,num.windows=20,right.side=F)
@@ -252,32 +276,29 @@ Tcdf2 <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, qfft.apply = sap
       best.l<-left.tail$best
       b.l<-left.tail$b/s
       a.l <- log.cdf.l[best.l]-xx[best.l]*b.l
-      c.l <- 0
     }else{
-     c.l <- b.l <- a.l <- NA
+      b.l <- a.l <- NA
     }
 
     if( best.r != n ){
-      right.tail<-extrapolate_tail(log.cdf.r,xx.standardized,ctstart.r,best.r,num.windows=20,right.side=T)
+      right.tail<-extrapolate_tail(log.cdf.r,log(abs(xx.standardized+mu.s)),ctstart.r,best.r,num.windows=20,right.side=T)
 
       if(right.tail$successful){
         best.r<-right.tail$best
-        b.r<-right.tail$b/s
-        a.r <- log.cdf.r[best.r]-xx[best.r]*b.r
-        c.r <- -exp(-(a.r+b.r*(-mu.s)))
-
+        b.r<-right.tail$b
+        a.r <- log.cdf.r[best.r]-log(abs(xx[best.r]))*b.r
       }else{
-        c.r <- b.r <- a.r <- NA
+        b.r <- a.r <- NA
       }
 
     }else{
       b.r <- NULL
       a.r <- NULL
-      c.r <- NULL
     }
   }
 
-  if(esrange[1]<0 & esrange[2]>0){ # We have both positive and negative eigenvalues
+  # If we have both positive and negative eigenvalues
+  if(esrange[1]<0 & esrange[2]>0){
 
     limit.r <- Inf
     limit.l <- -Inf
@@ -306,44 +327,38 @@ Tcdf2 <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, qfft.apply = sap
   }
 
 
+  # If a.l and b.l return NA, that means extrapolation failed but should have been done
+  # If a.l and b.l return NULL, that means that no extrapolation for them was necessary because
+  # x covers limit.l
 
-  list("x" = xx,
-       "y" = fft_cdf,
+  list("x" = xx[best.l:best.r],
+       "y" = fft_cdf[best.l:best.r],
        "interval.width"=(b-a)/n,
        "limit.l" = limit.l,
-       "index.l" = best.l,
        "a.l" = a.l,
        "b.l" = b.l,
-       "c.l" = c.l,
        "limit.r" = limit.r,
-       "index.r" = best.r,
        "a.r" = a.r,
-       "b.r" = b.r,
-       "c.r" = c.r)
-
-
-  # The function returns the full output of the FFT
-  # if limit.l
+       "b.r" = b.r)
 }
 
-system.time(test<-Tcdf2(evals=l.e.vals,n=2^14-1))
+system.time(test<-Tcdf2(evals=abs(l.e.vals),n=2^16-1))
 
 plot(test$x,test$y,type="l",col="blue")
 
-#plot(log(test$x[1:1000]),-log(test$y)[1:1000]/log(10),type="l",col="blue",ylim=c(0,50))
-abline(test$a.l,test$b.l)
-
-xx<-seq(min(test$x[1:1000],max(test$x[1:1000])),len=10000)
-lines(xx,-log(exp(-(test$a.l+xx*test$b.l))+test$c.l))
-abline(v=test$x[test$index.l])
-
 plot(test$x,-log1p(-test$y),type="l",col="blue")
 abline(test$a.r,test$b.r)
-abline(v=test$x[test$index.r])
+
+
+plot(log(abs(test$x)),-log1p(-test$y),type="l",col="blue")
+abline(test$a.r,test$b.r)
 
 plot(test$x,-log(test$y),type="l",col="blue")
 abline(test$a.l,test$b.l)
-abline(v=test$x[test$index.l])
+
+
+plot(log(test$x),-log(test$y),type="l",col="blue")
+abline(test$a.l,test$b.l)
 
 
 
