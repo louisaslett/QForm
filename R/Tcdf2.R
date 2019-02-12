@@ -131,35 +131,33 @@ Tcdf2 <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, qfft.apply = sap
   # Determine on how fine a grid we need to FFT (will determine the interval on which we estimate the density)
   ####################################
 
-  esrange<-range(evals.s) # these eigenvalues are not centered
+  pos.semi.def <- all(evals.s>=0)
+  neg.semi.def <- all(evals.s<=0)
 
-  if(esrange[2]>0){
-    b.standardized <- uniroot(function(z,nu,resid.op.norm.bd,bound) {
-      # This is our concentration inequality
-      ifelse(z <= nu / (4*resid.op.norm.bd),
-             0.5*(z^2) / nu,
-             z / (4*resid.op.norm.bd) - 0.5*nu / ((4*resid.op.norm.bd)^2) ) / log(10) - bound
-    }, lower = 0, upper = 1e3*sigma/s,tol = .Machine$double.eps,
-    nu = 8*sum(ncps*(evals.s^2))+4*sum(evals.s^2), resid.op.norm.bd = esrange[2], bound = 17,
-    extendInt = "upX")$root
+  # If neg.semi.definite, flip all eigenvalues to make it a PSD problem (flip back later)
+  if(neg.semi.def){evals.s <- - evals.s}
 
+
+  b.standardized <- uniroot(function(z,nu,resid.op.norm.bd,bound) {
+    # This is our concentration inequality
+    ifelse(z <= nu / (4*resid.op.norm.bd),
+           0.5*(z^2) / nu,
+           z / (4*resid.op.norm.bd) - 0.5*nu / ((4*resid.op.norm.bd)^2) ) / log(10) - bound
+  }, lower = 0, upper = 1e3*sigma/s,tol = .Machine$double.eps,
+  nu = 8*sum(ncps*(evals.s^2))+4*sum(evals.s^2), resid.op.norm.bd = max(evals.s), bound = 17,
+  extendInt = "upX")$root
+
+  if(pos.semi.def | neg.semi.def){
+    a.standardized <- -mu.s
   }else{
-    # If you know the CDF must stop at 0, then evaluate up to there on standardized, centered scale
-    b.standardized <- -mu.s
-  }
-
-  if(esrange[1]<0){
     a.standardized <- -uniroot(function(z,nu,resid.op.norm.bd,bound) {
       # This function is negative log of H
       ifelse(z <= nu / (4*resid.op.norm.bd),
              0.5*(z^2) / nu,
              z / (4*resid.op.norm.bd) - 0.5*nu / ((4*resid.op.norm.bd)^2) ) / log(10) - bound
     }, lower = 0, upper = 1e3*sigma/s,tol = .Machine$double.eps,
-    nu = 8*sum(ncps*(evals.s^2))+4*sum(evals.s^2), resid.op.norm.bd = -esrange[1], bound = 17,
+    nu = 8*sum(ncps*(evals.s^2))+4*sum(evals.s^2), resid.op.norm.bd = abs(min(evals.s)), bound = 17,
     extendInt = "upX")$root
-  }else{
-    # If you know the CDF must stop at 0, then evaluate up to there on standardized, centered scale
-    a.standardized <- -mu.s
   }
 
   # Evaluate CDF using FFT
@@ -201,21 +199,18 @@ Tcdf2 <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, qfft.apply = sap
   # First: Eliminate Parts of the Estimated CDF that deviate below 0 or above 1 (allowed to hit 0 or 1 at the
   # last point if all of the eigenvalues have the same sign and the domain of the CDF has a bound on that side)
 
-  if(esrange[2]<=0){ # All eigenvalues are zero or negative
-    fft_cdf[n] <- 1
-    r0 <- which( fft_cdf[ctstart.r:(n-1)]>=1 )
-  }else{
-    r0 <- which( fft_cdf[ctstart.r:n]>=1 )
-  }
 
-  if(esrange[1]>=0){ # All eigenvalues are zero or positive
-    fft_cdf[1] <- 0
-    l0 <- which( fft_cdf[2:ctstart.l]<=0 )+1
-  }else{
-    l0 <- which( fft_cdf[1:ctstart.l]<=0 )
-  }
+  r0 <- which(fft_cdf[ctstart.r:n] >= 1)
 
   best.r <- ifelse(length(r0)==0, n, ctstart.r-2+min(r0)) # One point in from the trouble point
+
+  if(pos.semi.def | neg.semi.def){ # All eigenvalues are zero or positive
+    fft_cdf[1] <- 0
+    l0 <- which(fft_cdf[2:ctstart.l] <= 0)+1
+  }else{
+    l0 <- which(fft_cdf[1:ctstart.l] <= 0)
+  }
+
   best.l <- ifelse(length(l0)==0, 1, max(l0)+1) # One point in from the trouble point
 
 
@@ -235,8 +230,7 @@ Tcdf2 <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, qfft.apply = sap
 
   # Finally: refine extrapolation points by cropping off the density when it starts becoming curvy due to numerical instability
 
-  # If all eigenvalues are zero or positive
-  if(esrange[1]>=0){
+  if(pos.semi.def | neg.semi.def){
     limit.l <- 0
     limit.r <- Inf
     right.tail<-extrapolate_tail(log.cdf.r,xx.standardized,ctstart.r,best.r,num.windows=20,right.side=T)
@@ -266,39 +260,8 @@ Tcdf2 <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, qfft.apply = sap
     }
   }
 
-  # If all eigenvalues are zero or negative
-  if(esrange[2]<=0){
-    limit.l <- Inf
-    limit.r <- 0
-    left.tail<-extrapolate_tail(log.cdf.l,xx.standardized,ctstart.l,best.l,num.windows=20,right.side=F)
-
-    if(left.tail$successful){
-      best.l<-left.tail$best
-      b.l<-left.tail$b/s
-      a.l <- log.cdf.l[best.l]-xx[best.l]*b.l
-    }else{
-      b.l <- a.l <- NA
-    }
-
-    if( best.r != n ){
-      right.tail<-extrapolate_tail(log.cdf.r,log(abs(xx.standardized+mu.s)),ctstart.r,best.r,num.windows=20,right.side=T)
-
-      if(right.tail$successful){
-        best.r<-right.tail$best
-        b.r<-right.tail$b
-        a.r <- log.cdf.r[best.r]-log(abs(xx[best.r]))*b.r
-      }else{
-        b.r <- a.r <- NA
-      }
-
-    }else{
-      b.r <- NULL
-      a.r <- NULL
-    }
-  }
-
   # If we have both positive and negative eigenvalues
-  if(esrange[1]<0 & esrange[2]>0){
+  if(!(pos.semi.def | neg.semi.def)){
 
     limit.r <- Inf
     limit.l <- -Inf
@@ -310,20 +273,17 @@ Tcdf2 <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, qfft.apply = sap
       best.l<-left.tail$best
       b.l<-left.tail$b/s
       a.l <- log.cdf.l[best.l]-xx[best.l]*b.l
-      c.l <- 0
     }else{
-      c.l <- b.l <- a.l <- NA
+      b.l <- a.l <- NA
     }
 
     if(right.tail$successful){
       best.r<-right.tail$best
       b.r<-right.tail$b/s
       a.r <- log.cdf.r[best.r]-xx[best.r]*b.r
-      c.r <- 0
     }else{
-      c.r <- b.r <- a.r <- NA
+      b.r <- a.r <- NA
     }
-
   }
 
 
@@ -331,8 +291,29 @@ Tcdf2 <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, qfft.apply = sap
   # If a.l and b.l return NULL, that means that no extrapolation for them was necessary because
   # x covers limit.l
 
-  list("x" = xx[best.l:best.r],
-       "y" = fft_cdf[best.l:best.r],
+
+  xx = xx[best.l:best.r]
+  fft_cdf = fft_cdf[best.l:best.r]
+
+  # Flip around if neg.semi.def
+  if(neg.semi.def){
+    xx <- -rev(xx)
+    fft_cdf <- 1-rev(fft_cdf)
+    limit.r <- 0
+    limit.l <- -Inf
+    a.l.2 <- a.r
+    b.l.2 <- -b.r
+    a.r <- a.l
+    b.r <- b.l
+    a.l <- a.l.2
+    b.l <- b.l.2
+    # best.l <- n - best.l + 1
+    # best.r <- n - best.r + 1
+  }
+
+  list("x" = xx,
+       "y" = fft_cdf,
+       "n" = abs(best.r-best.l)+1,
        "interval.width"=(b-a)/n,
        "limit.l" = limit.l,
        "a.l" = a.l,
@@ -342,29 +323,78 @@ Tcdf2 <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, qfft.apply = sap
        "b.r" = b.r)
 }
 
-system.time(test<-Tcdf2(evals=abs(l.e.vals),n=2^16-1))
 
+# Indefinite Case
+######################
+system.time(test<-Tcdf2(evals=l.e.vals,n=2^16-1))
 plot(test$x,test$y,type="l",col="blue")
-
-plot(test$x,-log1p(-test$y),type="l",col="blue")
-abline(test$a.r,test$b.r)
-
-
-plot(log(abs(test$x)),-log1p(-test$y),type="l",col="blue")
-abline(test$a.r,test$b.r)
-
-plot(test$x,-log(test$y),type="l",col="blue")
-abline(test$a.l,test$b.l)
-
-
-plot(log(test$x),-log(test$y),type="l",col="blue")
-abline(test$a.l,test$b.l)
+# Look at extrapolation of right tail
+xx.r <- seq(test$x[c(test$n-10)],3*test$x[test$n]-test$x[c(test$n-10)],len=1000)
+plot(xx.r,-expm1(-(test$a.r+test$b.r*xx.r)),type="l")
+points(test$x[c(test$n-10):test$n],test$y[c(test$n-10):test$n])
+abline(h=1)
+# Look at extrapolation of left tail
+xx.l <- seq(4*test$x[1]-test$x[10],test$x[10],len=1000)
+plot(xx.l,exp(-(test$a.l+test$b.l*xx.l)),type="l")
+points(test$x[1:10],test$y[1:10])
+abline(h=0)
 
 
+# Positive Semi-definite Case
+######################
+system.time(test<-Tcdf2(evals=abs(l.e.vals),n=2^16-1))
+plot(test$x,test$y,type="l",col="blue")
+# Look at extrapolation of right tail
+xx.r <- seq(test$x[c(test$n-10)],3*test$x[test$n]-test$x[c(test$n-10)],len=1000)
+plot(xx.r,-expm1(-(test$a.r+test$b.r*xx.r)),type="l")
+points(test$x[c(test$n-10):test$n],test$y[c(test$n-10):test$n])
+abline(h=1)
+# Look at extrapolation of left tail
+xx.l <- seq(0,test$x[10],len=1000)
+plot(xx.l,exp(-(test$a.l+test$b.l*log(xx.l))),type="l")
+points(test$x[1:10],test$y[1:10])
+abline(h=0)
 
 
-xxx<-seq(0,1e-1,len=1000)
-plot(log(xxx),log(-pchisq(xxx,df=2,lower.tail = T,log.p = T,ncp=100)),type="l")
+# Negative Semi-definite Case
+######################
+system.time(test<-Tcdf2(evals=-abs(l.e.vals),n=2^16-1))
+plot(test$x,test$y,type="l",col="blue")
+# Look at extrapolation of right tail
+xx.r <- seq(test$x[c(test$n-10)],0,len=1000)
+plot(xx.r,-expm1(-(test$a.r+test$b.r*(log(abs(xx.r))))),type="l")
+points(test$x[c(test$n-10):test$n],test$y[c(test$n-10):test$n])
+abline(h=1)
+# Look at extrapolation of left tail
+xx.l <- seq(2.2*test$x[1]-test$x[10],test$x[10],len=1000)
+plot(xx.l,exp(-(test$a.l+test$b.l*xx.l)),type="l")
+points(test$x[1:10],test$y[1:10])
+abline(h=0)
+
+
+
+#######
+# Lets look at these extrapolation lines on the log scale when appropriate below
+#######
+# Plot Right Tail
+if(is.infinite(test$limit.r)){
+  plot(test$x,-log1p(-test$y),type="l",col="blue",ylim=c(0,30),xlim=c(min(test$x),max(test$x)+((max(test$x)-min(test$x))/4)), lwd=2)
+  abline(test$a.r,test$b.r,lty=2)
+}else{
+  plot(-log(abs(test$x)),-log1p(-test$y),type="l",col="blue")#,ylim=c(0,30),xlim=c(min(test$x),max(test$x)+((max(test$x)-min(test$x))/4)), lwd=2)
+  abline(test$a.r,test$b.r,lty=2)
+}
+
+# Plot Left Trail
+if(is.infinite(test$limit.l)){
+  plot(test$x,-log(test$y),type="l",col="blue",lwd=2)
+  abline(test$a.l,test$b.l,lty=2)
+}else{
+  plot(log(test$x),-log(test$y),type="l",col="blue",lwd=2)
+  abline(test$a.l,test$b.l,lty=2)
+}
+
+
 
 # Gotta come back and make sure that former best.l are not discarded and also implement
 # the interpolation back to 0.
