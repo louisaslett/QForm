@@ -426,81 +426,80 @@ eval.cdf.ind <- function(q, cdf, lower.tail = T, log.p = F){
 
 
 
-
-
-
-
-require(RcppRoll)
-# Indefinite Case
-######################
-system.time(t.cdf<-calc.QFcdf(evals=evals,n=2^16-1))
-plot(t.cdf$x,t.cdf$y,type="l",col="blue")
-# Look at extrapolation of right tail
-xx.r <- seq(test$x[c(test$n-10)],3*test$x[test$n]-test$x[c(test$n-10)],len=1000)
-plot(xx.r,-expm1(-(test$a.r+test$b.r*xx.r)),type="l")
-points(test$x[c(test$n-10):test$n],test$y[c(test$n-10):test$n])
-abline(h=1)
-# Look at extrapolation of left tail
-xx.l <- seq(4*test$x[1]-test$x[10],test$x[10],len=1000)
-plot(xx.l,exp(-(test$a.l+test$b.l*xx.l)),type="l")
-points(test$x[1:10],test$y[1:10])
-abline(h=0)
-
-
-# Positive Semi-definite Case
-######################
-system.time(test<-Tcdf2(evals=abs(evals),n=2^16-1))
-plot(test$x,test$y,type="l",col="blue")
-# Look at extrapolation of right tail
-xx.r <- seq(test$x[c(test$n-10)],3*test$x[test$n]-test$x[c(test$n-10)],len=1000)
-plot(xx.r,-expm1(-(test$a.r+test$b.r*xx.r)),type="l")
-points(test$x[c(test$n-10):test$n],test$y[c(test$n-10):test$n])
-abline(h=1)
-# Look at extrapolation of left tail
-xx.l <- seq(0,test$x[10],len=1000)
-plot(xx.l,exp(-(test$a.l+test$b.l*log(xx.l))),type="l")
-points(test$x[1:10],test$y[1:10])
-abline(h=0)
-test$b.l
-
-# Negative Semi-definite Case
-######################
-system.time(test<-Tcdf2(evals=-abs(evals),n=2^16-1))
-plot(test$x,test$y,type="l",col="blue")
-# Look at extrapolation of right tail
-xx.r <- seq(test$x[c(test$n-10)],0,len=1000)
-plot(xx.r,-expm1(-(test$a.r+test$b.r*(log(abs(xx.r))))),type="l")
-points(test$x[c(test$n-10):test$n],test$y[c(test$n-10):test$n])
-abline(h=1)
-# Look at extrapolation of left tail
-xx.l <- seq(2.2*test$x[1]-test$x[10],test$x[10],len=1000)
-plot(xx.l,exp(-(test$a.l+test$b.l*xx.l)),type="l")
-points(test$x[1:10],test$y[1:10])
-abline(h=0)
-
-
-
-#######
-# Lets look at these extrapolation lines on the log scale when appropriate below
-#######
-# Plot Right Tail
-if(is.infinite(test$limit.r)){
-  plot(test$x,-log1p(-test$y),type="l",col="blue",ylim=c(0,30),xlim=c(min(test$x),max(test$x)+((max(test$x)-min(test$x))/4)), lwd=2)
-  abline(test$a.r,test$b.r,lty=2)
-}else{
-  plot(-log(abs(test$x)),-log1p(-test$y),type="l",col="blue")#,ylim=c(0,30),xlim=c(min(test$x),max(test$x)+((max(test$x)-min(test$x))/4)), lwd=2)
-  abline(test$a.r,test$b.r,lty=2)
-}
-
-# Plot Left Trail
-if(is.infinite(test$limit.l)){
-  plot(test$x,-log(test$y),type="l",col="blue",lwd=2)
-  abline(test$a.l,test$b.l,lty=2)
-}else{
-  plot(log(test$x),-log(test$y),type="l",col="blue",lwd=2)
-  abline(test$a.l,test$b.l,lty=2)
-}
-
+#
+# Testing!
+#
+# require(RcppRoll)
+# # Indefinite Case
+# ######################
+# system.time(t.cdf<-calc.QFcdf(evals=evals,n=2^16-1))
+# plot(t.cdf$x,t.cdf$y,type="l",col="blue")
+# # Look at extrapolation of right tail
+# xx.r <- seq(test$x[c(test$n-10)],3*test$x[test$n]-test$x[c(test$n-10)],len=1000)
+# plot(xx.r,-expm1(-(test$a.r+test$b.r*xx.r)),type="l")
+# points(test$x[c(test$n-10):test$n],test$y[c(test$n-10):test$n])
+# abline(h=1)
+# # Look at extrapolation of left tail
+# xx.l <- seq(4*test$x[1]-test$x[10],test$x[10],len=1000)
+# plot(xx.l,exp(-(test$a.l+test$b.l*xx.l)),type="l")
+# points(test$x[1:10],test$y[1:10])
+# abline(h=0)
+#
+#
+# # Positive Semi-definite Case
+# ######################
+# system.time(test<-Tcdf2(evals=abs(evals),n=2^16-1))
+# plot(test$x,test$y,type="l",col="blue")
+# # Look at extrapolation of right tail
+# xx.r <- seq(test$x[c(test$n-10)],3*test$x[test$n]-test$x[c(test$n-10)],len=1000)
+# plot(xx.r,-expm1(-(test$a.r+test$b.r*xx.r)),type="l")
+# points(test$x[c(test$n-10):test$n],test$y[c(test$n-10):test$n])
+# abline(h=1)
+# # Look at extrapolation of left tail
+# xx.l <- seq(0,test$x[10],len=1000)
+# plot(xx.l,exp(-(test$a.l+test$b.l*log(xx.l))),type="l")
+# points(test$x[1:10],test$y[1:10])
+# abline(h=0)
+# test$b.l
+#
+# # Negative Semi-definite Case
+# ######################
+# system.time(test<-Tcdf2(evals=-abs(evals),n=2^16-1))
+# plot(test$x,test$y,type="l",col="blue")
+# # Look at extrapolation of right tail
+# xx.r <- seq(test$x[c(test$n-10)],0,len=1000)
+# plot(xx.r,-expm1(-(test$a.r+test$b.r*(log(abs(xx.r))))),type="l")
+# points(test$x[c(test$n-10):test$n],test$y[c(test$n-10):test$n])
+# abline(h=1)
+# # Look at extrapolation of left tail
+# xx.l <- seq(2.2*test$x[1]-test$x[10],test$x[10],len=1000)
+# plot(xx.l,exp(-(test$a.l+test$b.l*xx.l)),type="l")
+# points(test$x[1:10],test$y[1:10])
+# abline(h=0)
+#
+#
+#
+# #######
+# # Lets look at these extrapolation lines on the log scale when appropriate below
+# #######
+# # Plot Right Tail
+# if(is.infinite(test$limit.r)){
+#   plot(test$x,-log1p(-test$y),type="l",col="blue",ylim=c(0,30),xlim=c(min(test$x),max(test$x)+((max(test$x)-min(test$x))/4)), lwd=2)
+#   abline(test$a.r,test$b.r,lty=2)
+# }else{
+#   plot(-log(abs(test$x)),-log1p(-test$y),type="l",col="blue")#,ylim=c(0,30),xlim=c(min(test$x),max(test$x)+((max(test$x)-min(test$x))/4)), lwd=2)
+#   abline(test$a.r,test$b.r,lty=2)
+# }
+#
+# # Plot Left Trail
+# if(is.infinite(test$limit.l)){
+#   plot(test$x,-log(test$y),type="l",col="blue",lwd=2)
+#   abline(test$a.l,test$b.l,lty=2)
+# }else{
+#   plot(log(test$x),-log(test$y),type="l",col="blue",lwd=2)
+#   abline(test$a.l,test$b.l,lty=2)
+# }
+#
 
 
 # Gotta come back and make sure that former best.l are not discarded and also implement
