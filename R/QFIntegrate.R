@@ -1,149 +1,637 @@
 
 
+# Declare Header Functions
+G1<-function(from,to,b){
+  
+  n1 <- length(from)
+  n2 <- length(to)
+  if(n1>1 & n2>1){stop("either from or to may be vectors but not both at the same time")}
+  n <- max(n1,n2)
+  
+  # This performs the integral $ \int_\from^\to exp(-b*z) dz $ for any sign of b.
+  if(any(to<from)){warning("some to > from, so for those values returning -Inf")}
+  if(any(is.infinite(from) & is.infinite(to))){stop("both from and psi cannot be infinite")}
+  if(any(is.infinite(from) & from > 0)){stop("from cannot be positive infinity")}
+  if(any(is.infinite(to) & to < 0)){stop("from cannot be negative infinity")}
+  if(any(is.infinite(from)) & b > 0){stop("b cannot be positive when from is negative infinity --> integral does not converge")}
+  if(any(is.infinite(to)) & b < 0){stop("b cannot be negative when to is infinity --> integral does not converge")}
+  
+  ifelse(to<=from, -Inf, ifelse(rep(b,n)==0,-a+log(to-from),-log(abs(b))+log(-expm1(-abs(b)*(to-from)))-b*ifelse(rep(b,n)>0,from,to)))
+}
+#G1 is correct
+#print(-G1(-20:-10,Inf,2)/log(10),digits=22)
+#print(-log(integrate(f=function(z,b){exp(-b*z)},lower =-20,upper = Inf,b=2)$value)/log(10),digits=22)
 
-## Begin Example
+
+G2 <- function(from, to, b, L){
+  # This function performs Gauss Quadrature if L < 0. 
+  # either from or to may be vectors but not both simultaneously
+  if(any(to<from)){warning("some to > from, so for those values returning -Inf")}
+  if(b>=1){stop("b must be < 1")}
+  
+  n1 <- length(to)
+  n2 <- length(from)
+  n <- max(n1,n2)
+  ifelse(to<=from,-Inf,ifelse(rep(L,n)<0,
+  Vectorize(function(from,to,b,L){log(integrate(f=function(z,b,L){z^(-b)*exp(-L*z)},lower = from,upper = to,b=b,L=L)$value)},vectorize.args = c("from","to"))(from, to, b, L)
+                              ,-(1-b)*log(L)+pgamma(L*to,1-b,log.p = T)+lgamma(1-b) + (from >0)*log(-expm1(pgamma(L*from,1-b,log.p = T)- pgamma(L*to,1-b,log.p = T)))))
+}
+#G2 is correct
+# print(G2(0,c(0.1,0.2),-3,-10),digits=22)
+# print(log(integrate(f=function(z,b,L){z^(-b)*exp(-L*z)},lower = 0,upper = 0.2,b=-3,L=-10)$value),digits=22)
+
+
+
+G3 <- function(from, to, mu, nu ){
+  if(nu<=0){stop("nu must be > 0")}
+  if(any(to<from)){warning("some to > from, so for those values returning -Inf")}
+  s<-sqrt(nu)
+  from.tilde <- (from - mu)/s
+  to.tilde <- (to - mu)/s
+  ifelse(to<=from,-Inf,0.5*log(2*pi*nu) + pnorm(to.tilde,log.p = T) + log(-expm1(pnorm(from.tilde,log.p = T)-pnorm(to.tilde,log.p = T))))
+}
+# #G3 is correct
+print(exp(G3(lower.prime,upper.prime,q-c2-b*nu,nu)),digits=22)
+print(integrate(f=function(z,mu,nu){exp(-0.5*(z-mu)^2/nu)},lower = lower.prime,upper = upper.prime,mu=q-c2-b*nu,nu=nu,rel.tol = 1e-13)$value,digits=22)
+# print(exp(G3(-20,-10,0,.1)),digits=22)
+# print(integrate(f=function(z,mu,nu){exp(-0.5*(z-mu)^2/nu)},lower = -20,upper = -10,mu=0,nu=.1,rel.tol = 1e-13)$value,digits=22)
+# 
+
+
+G4 <- function(from, to, mu, nu ){
+  if(nu<=0){stop("nu must be > 0")}
+  if(any(to<from)){warning("some to > from, so for those values returning -Inf")}
+  s<-sqrt(nu)
+  from.tilde <- (from - mu)/s
+  to.tilde <- (to - mu)/s
+  ifelse(to<=from,-Inf,0.5*log(2*pi*nu) + log( s*(dnorm(from.tilde)-dnorm(to.tilde))
+                                               + mu*(pnorm(to.tilde)-pnorm(from.tilde))
+  ))
+}
+# #G4 is correct
+print(exp(G4(lower.prime,upper.prime,q-c2-b*nu,nu)),digits=22)
+print(integrate(f=function(z,mu,nu){z*exp(-0.5*(z-mu)^2/nu)},lower = lower.prime,upper = upper.prime,mu=q-c2-b*nu,nu=nu,rel.tol = 1e-13)$value,digits=22)
+
+# print(exp(G4(20,30,0,1)),digits=22)
+# print(integrate(f=function(z,mu,nu){z*exp(-0.5*(z-mu)^2/nu)},lower = 20,upper = 30,mu=0,nu=1,rel.tol = 1e-13)$value,digits=22)
+
+
+
+G5 <- function(from, to, b, nu ){
+  if(any(from<0)){stop("from must be >= 0")}
+  if(any(to<from)){warning("some to > from, so for those values returning -Inf")}
+  if(b>=2){stop("b must be < 2")}
+  ifelse(to<=from,-Inf,-log(2) + G2(from^2,to^2,b/2,1/(2*nu)))
+}
+# #G5 is correct
+# print(exp(G5(-5,0:10,-2,2)),digits=22)
+# print(integrate(f=function(z,b,nu){z^(1-b)*exp(-0.5*z^2/nu)},lower = 1,upper = 4,b=-20,nu=.02)$value,digits=22)
+
+
+WrapConcIneq.identity <- function(c1,c2,nu,L){
+  u = function(x) ifelse(x<0,1,ifelse(x < nu*L, exp(-0.5*(x^2)/nu), exp(0.5*nu*L^2-L*x)))
+  l = function(x) ifelse(x>0,1,ifelse(x > -nu*L, exp(-0.5*(x^2)/nu), exp(0.5*nu*L^2+L*x)))
+  
+    list(
+    "L" = L,
+    "nu" = nu,
+    "u" = u,
+    "l" = l,
+    "c1" = c1,
+    "h1" = function(q,t){ 
+      ifelse(t >= q-c1, 0 , ifelse(t > q-c1-nu*L, (q-c1-t)*exp(-0.5*((q-c1-t)^2)/nu)/nu,L*exp(0.5*nu*L^2-(q-c1)*L+L*t)))
+    },
+    "int.h1.const" = function(lower, upper, q){
+      u(q-c1-upper) - u(q-c1-lower)
+    },
+    "int.h1.expx" = function(lower, upper, q, a, b){
+      lower.prime <- pmax(lower,q-c1-nu*L)
+      upper.prime <- pmin(upper,q-c1)
+      upper.prime.prime <- pmin(upper,q-c1-nu*L)
+      
+      (lower.prime < upper.prime)*exp((nu*b^2)/2 - b*(q-c1)-a)*((q-c1)*exp(G3(lower.prime,upper.prime,q-c1-b*nu,nu))-exp(G4(lower.prime,upper.prime,q-c1-b*nu,nu)))/nu + (lower < upper.prime.prime)*L*exp(0.5*nu*L^2-(q-c1)*L-a+G1(lower,upper.prime.prime,b-L))
+    },
+    "int.h1.explogx" = function(lower, upper, q, a, b){
+      lower.prime <- pmax(lower,q-c1-nu*L)
+      upper.prime <- pmin(upper,q-c1)
+      upper.prime.prime <- pmin(upper,q-c1-nu*L)
+      
+      t.func <- function(t,q,c1,b,nu) { (q-c1-t)*t^(-b) * dnorm(t, mean = q-c1, sd = sqrt(nu)) }
+      
+      (lower.prime < upper.prime)*exp(-a)*sqrt(2*pi/nu)*Vectorize(function(f,lower,upper,q,c1,b,nu){integrate(f = f, lower = lower, upper = upper, q = q, c1 = c1, b = b, nu = nu)$value},vectorize.args = c("lower","upper"))(t.func, lower.prime, upper.prime, q, c1, b, nu)
+      + (lower < upper.prime.prime)*L*exp(0.5*nu*L^2-(q-c1)*L-a+G2(lower, upper.prime.prime, b, -L))
+    },
+    "int.h1.explognegx" = function(lower, upper, q, a, b){
+      lower.prime <- pmax(lower,q-c1-nu*L)
+      upper.prime <- pmin(upper,q-c1)
+      upper.prime.prime <- pmin(upper,q-c1-nu*L)
+      
+      z.func <- function(z,q,c1,b,nu) { (q-c1+z)*z^(-b) * dnorm(z, mean = q-c1, sd = sqrt(nu)) }
+      
+      (lower.prime < upper.prime)*exp(-a)*sqrt(2*pi/nu)*Vectorize(function(f,lower,upper,q,c1,b,nu){integrate(f = f, lower = lower, upper = upper, q = q, c1 = c1, b = b, nu = nu)$value},vectorize.args = c("lower","upper"))(z.func, -upper.prime, -lower.prime, q, c1, b, nu) 
+      + (lower < upper.prime.prime)*L*exp(0.5*nu*L^2-(q-c1)*L-a+G2(-upper.prime.prime,-lower, b, L))
+    },
+    "c2" = c2,
+    "h2" = function(q,t){ 
+      ifelse(t <= q-c2, 0 , ifelse(t < q-c2+nu*L, (c2-q+t)*exp(-0.5*((c2-q+t)^2)/nu)/nu,L*exp(0.5*nu*L^2-(c2-q)*L-L*t)))
+    },
+    "int.h2.const" = function(lower, upper, q){
+      u(c2-q+lower) - u(c2-q+upper)
+    },
+    "int.h2.expx" = function(lower, upper, q, a, b){
+      lower.prime <- pmax(lower,q-c2)
+      upper.prime <- pmin(upper,q-c2+nu*L)
+      lower.prime.prime <- pmax(lower,q-c2+nu*L)
+      
+      (lower.prime < upper.prime)*exp((nu*b^2)/2 - b*(q-c2)-a)*((c2-q)*exp(G3(lower.prime,upper.prime,q-c2-b*nu,nu))+exp(G4(lower.prime,upper.prime,q-c2-b*nu,nu)))/nu + (lower.prime.prime < upper)*L*exp(0.5*nu*L^2+(q-c2)*L-a+G1(lower.prime.prime,upper,b+L))
+    },
+    "int.h2.explogx" = function(lower, upper, q, a, b){
+      lower.prime <- pmax(lower,q-c2)
+      upper.prime <- pmin(upper,q-c2+nu*L)
+      lower.prime.prime <- pmax(lower,q-c2+nu*L)
+      
+      t.func <- function(t,q,c2,b,nu) { (c2-q+t)*t^(-b) * dnorm(t, mean = q-c2, sd = sqrt(nu)) }
+      
+      (lower.prime < upper.prime)*exp(-a)*sqrt(2*pi/nu)*Vectorize(function(f,lower,upper,q,c2,b,nu){integrate(f = f, lower = lower, upper = upper, q = q, c2 = c2, b = b, nu = nu)$value},vectorize.args = c("lower","upper"))(t.func, lower.prime, upper.prime, q, c2, b, nu)
+      + (lower.prime.prime < upper)*L*exp(0.5*nu*L^2+(q-c2)*L-a+G2(lower.prime.prime, upper, b, L))
+    },
+    "int.h2.explognegx" = function(lower, upper, q, a, b){
+      lower.prime <- pmax(lower,q-c2)
+      upper.prime <- pmin(upper,q-c2+nu*L)
+      lower.prime.prime <- pmax(lower,q-c2+nu*L)
+      
+      z.func <- function(z,q,c2,b,nu) { (c2-q-z)*z^(-b) * dnorm(z, mean = c2-q, sd = sqrt(nu)) }
+      
+      (lower.prime < upper.prime)*exp(-a)*sqrt(2*pi/nu)*Vectorize(function(f,lower,upper,q,c2,b,nu){integrate(f = f, lower = lower, upper = upper, q = q, c2 = c2, b = b, nu = nu)$value},vectorize.args = c("lower","upper"))(z.func, -upper.prime, -lower.prime, q, c2, b, nu)
+      + (lower.prime.prime < upper)*L*exp(0.5*nu*L^2-(c2-q)*L-a+G2(-upper,-lower.prime.prime, b, -L))
+    }
+  )
+}
+
+
+
+
+GaussQuadCDF<-function(from, to, lower.bound = T, F.cdf,ql,qu,conc.ineqs){
+  components <- rep(0,2)
+  
+  c1 <- conc.ineqs$c1
+  c2 <- conc.ineqs$c2
+  nu <- conc.ineqs$nu
+  
+  if(lower.bound){
+    if(from < (ql-c1-sqrt(nu)))
+      components[1] <- integrate( function(t,ql){conc.ineqs$h1(ql,t)*F.cdf(t)}, lower=from,upper=min(to,ql-c1-sqrt(nu)),ql=ql,rel.tol = 1e-12)$value
+    if(to > (ql-c1-sqrt(nu)) & from < (ql-c1) ){
+      components[2] <- integrate( function(t,ql){conc.ineqs$h1(ql,t)*F.cdf(t)}, lower=max(ql-c1-sqrt(nu),from),upper=min(to,ql-c1),ql=ql,rel.tol=1e-12)$value
+    }
+  }
+  
+  if(!lower.bound){
+    
+    if((from < (qu-c2+sqrt(nu))) & (to > qu-c2) ){
+      components[1] <- integrate( function(t,qu){conc.ineqs$h2(qu,t)*F.cdf(t)}, lower=max(from,qu-c2),upper=min(to,qu-c2+sqrt(nu)),qu=qu,rel.tol = 1e-12)$value
+    }
+    if(to > (qu-c2+sqrt(nu)))
+      components[2] <- integrate( function(t,qu){conc.ineqs$h2(qu,t)*F.cdf(t)}, lower=max(from,qu-c2+sqrt(nu)),upper=to,qu=qu,rel.tol = 1e-12)$value
+  }
+  
+  sum(components)
+}
+
+  
+
+# Boole Quadrature Method
+require(PreciseSums)
+boole<-function(a,x,y,int.to.right=T,one.minus=F){
+  
+  # for int.to.right = T , this function integrates the function from a to max(x)
+  # for int.to.right = F , this function integrates from min(x) to a
+  # to obtain integral over the entire domain, just set a to min(x) and use int.to.right=T
+  
+  n <- length(x)
+  
+  # Swivel problem around the y axis if we need to go in the other direction
+  if(int.to.right==F){a <- - a ; x <- -rev(x) ; y <- rev(y)}
+  
+  if(a>x[n]){stop("There are no evaluations of the function on the choosen interval of integration")}
+  
+  left.remainder <- right.remainder <- inner.integral <- 0
+  
+  # a.index is the index of the smallest element in x that is greater than or equal to a.
+  a.index <- findInterval(a,x,left.open = T)+1
+  
+  if(x[a.index]!=a){
+    # Make trapezoid rule approximation to integrate from observed value to nearest larger grid point
+    left.remainder <- (y[a.index-1]+y[a.index])*(x[a.index]-a)/2
+  }
+  
+  if(a.index!=n){
+    
+    num.right.ragged.terms <- (n-a.index)%%4
+    
+    if(num.right.ragged.terms==0){
+      right.remainder <- 0
+      last.index <- n
+    }else if(num.right.ragged.terms==1){
+      right.remainder <- (y[n]+y[n-1])*(x[n]-x[n-1])/2
+      last.index <- n-1
+    }else if(num.right.ragged.terms==2){
+      right.remainder <- (y[n]+4*y[n-1]+y[n-2])*(x[n]-x[n-2])/6
+      last.index <- n-2
+    }else if(num.right.ragged.terms==3){
+      right.remainder <- 3*(y[n]+3*y[n-1]+3*y[n-2]+y[n-3])*(x[n]-x[n-3])/8
+      last.index <- n-3
+    }
+  }
+  
+  left.remainder.scaled <- left.remainder/((x[a.index+1]-x[a.index])*(2/45))
+  right.remainder.scaled <- right.remainder/((x[a.index+1]-x[a.index])*(2/45))
+  
+  
+  w<-c(14,32,12,32)
+  
+  if(one.minus==F){
+    
+    if(n-a.index >= 4){
+      vec<-c(w*y[a.index:(last.index-1)],7*y[last.index],-7*y[a.index],left.remainder.scaled,right.remainder.scaled)
+      norm.const <- 1/max(c(.Machine$double.eps, vec))
+      res <- (x[a.index+1]-x[a.index])*(2/45)*neumaierSum(c(vec*norm.const))/norm.const
+    }else{
+      vec<-c(left.remainder,right.remainder)
+      res <- neumaierSum(vec)
+    }
+    
+  }else{
+    
+    if(n-a.index >= 4){
+      vec<-c(45/(2*(x[a.index+1]-x[a.index])),-w*y[a.index:(last.index-1)],-7*y[last.index],7*y[a.index],
+             -left.remainder.scaled,-right.remainder.scaled)
+      norm.const <- 1/max(c(.Machine$double.eps, vec))
+      res <- (x[a.index+1]-x[a.index])*(2/45)*neumaierSum(c(vec/norm.const))*norm.const
+    }else{
+      vec<-c(1,-left.remainder,-right.remainder)
+      res <- neumaierSum(vec)
+      #res <- sum(sort(vec))
+    }
+    
+    
+  }
+  
+  res
+}
+# # # Testing Boole
+# testfunc<-function(x){sin(x*10)/(10*x)}
+# xx<-seq(1,3,len=10000)
+# boole(2,xx,testfunc(xx))
+# integrate(f = testfunc,lower = 2,upper = 3,rel.tol = 1e-14)
+#
+#
+
+QFIntegrate3<-function(ql,qu,t.cdf,conc.ineqs,lower.tail = T, log.p = F){ # L= 1/(4*max(abs(lambda)))
+  
+  # Initialize
+  upper.components <- lower.components <- rep(0,4)
+  F.cdf <- wrap.QFcdf(t.cdf)
+  
+  ### Compute Upper Bound
+  
+  upper.components[1] <- (1-conc.ineqs$l(-conc.ineqs$c2))*F.cdf(qu)
+  
+  if(qu < t.cdf$x[1]){
+    
+    if(t.cdf$type=="ind"){
+      upper.components[2] <- conc.ineqs$int.h2.expx(qu,t.cdf$x[1],qu,t.cdf$a.l,t.cdf$b.l)
+      upper.components[4] <- conc.ineqs$int.h2.const(t.cdf$x[t.cdf$n],Inf,qu)-conc.ineqs$int.h2.expx(t.cdf$x[t.cdf$n],Inf,qu,t.cdf$a.r,t.cdf$b.r)
+    }
+    if(t.cdf$type=="psd"){
+      upper.components[2] <- conc.ineqs$int.h2.explogx(max(qu,0),t.cdf$x[1],qu,t.cdf$a.l,t.cdf$b.l)
+      upper.components[4] <- conc.ineqs$int.h2.const(t.cdf$x[t.cdf$n],Inf,qu)-conc.ineqs$int.h2.expx(t.cdf$x[t.cdf$n],Inf,qu,t.cdf$a.r,t.cdf$b.r) 
+    }
+    if(t.cdf$type=="nsd"){
+      upper.components[2] <- conc.ineqs$int.h2.expx(qu,t.cdf$x[1],qu,t.cdf$a.l,t.cdf$b.l)
+      upper.components[4] <- conc.ineqs$int.h2.const(t.cdf$x[t.cdf$n],0,qu) - conc.ineqs$int.h2.explognegx(t.cdf$x[t.cdf$n],0,qu,t.cdf$a.r,t.cdf$b.r)
+    }
+    
+    #upper.components[3] <- boole(t.cdf$x[1],t.cdf$x, conc.ineqs$h2(qu,t.cdf$x)*t.cdf$y) #Boole integral from t.cdf$x[1] to t.cdf$x[n]
+    upper.components[3] <- GaussQuadCDF(t.cdf$x[1], t.cdf$x[t.cdf$n], F, F.cdf, ql, qu, conc.ineqs) #Gauss Quad integral from t.cdf$x[1] to t.cdf$x[n]
+    
+  }
+  
+  if((qu >= t.cdf$x[1]) & (qu < t.cdf$x[t.cdf$n])){
+    
+    if(t.cdf$type=="ind"){
+      upper.components[4] <- conc.ineqs$int.h2.const(t.cdf$x[t.cdf$n],Inf,qu)-conc.ineqs$int.h2.expx(t.cdf$x[t.cdf$n],Inf,qu,t.cdf$a.r,t.cdf$b.r)
+    }
+    if(t.cdf$type=="psd"){
+      upper.components[4] <- conc.ineqs$int.h2.const(t.cdf$x[t.cdf$n],Inf,qu)-conc.ineqs$int.h2.expx(t.cdf$x[t.cdf$n],Inf,qu,t.cdf$a.r,t.cdf$b.r) 
+    }
+    if(t.cdf$type=="nsd"){
+      upper.components[4] <- conc.ineqs$int.h2.const(t.cdf$x[t.cdf$n],0,qu) - conc.ineqs$int.h2.explognegx(t.cdf$x[t.cdf$n],0,qu,t.cdf$a.r,t.cdf$b.r)
+    }
+    
+    #upper.components[3] <- boole(qu,t.cdf$x, conc.ineqs$h2(qu,t.cdf$x)*t.cdf$y) #Boole integral from qu to t.cdf$x[n]
+    upper.components[3] <- GaussQuadCDF(qu, t.cdf$x[t.cdf$n], F, F.cdf, ql, qu, conc.ineqs) #Gauss Quad integral from qu to t.cdf$x[n]
+    
+  }
+  
+  if(qu >= t.cdf$x[t.cdf$n]){
+    
+    if(t.cdf$type=="ind"){
+      upper.components[4] <- conc.ineqs$int.h2.const(qu,Inf,qu)-conc.ineqs$int.h2.expx(qu,Inf,qu,t.cdf$a.r,t.cdf$b.r)
+    }
+    if(t.cdf$type=="psd"){
+      upper.components[4] <- conc.ineqs$int.h2.const(qu,Inf,qu)-conc.ineqs$int.h2.expx(qu,Inf,qu,t.cdf$a.r,t.cdf$b.r) 
+    }
+    if(t.cdf$type=="nsd"){
+      upper.components[4] <- conc.ineqs$int.h2.const(qu,0,qu) - conc.ineqs$int.h2.explognegx(qu,0,qu,t.cdf$a.r,t.cdf$b.r)
+    }
+    
+  }
+  
+  upper.bound <- neumaierSum(upper.components)
+  
+  
+  ### Compute Lower Bound
+  
+  lower.components[1] <- (1-conc.ineqs$u(-conc.ineqs$c1))*F.cdf(ql)
+  
+  if(ql > t.cdf$x[t.cdf$n]){
+    
+    if(t.cdf$type=="ind"){
+      lower.components[2] <- conc.ineqs$int.h1.expx(-Inf,t.cdf$x[1],ql,t.cdf$a.l,t.cdf$b.l)
+      lower.components[4] <- conc.ineqs$int.h1.const(t.cdf$x[t.cdf$n],ql,ql)-conc.ineqs$int.h1.expx(t.cdf$x[t.cdf$n],ql,ql,t.cdf$a.r,t.cdf$b.r)
+    }
+    if(t.cdf$type=="psd"){
+      lower.components[2] <- conc.ineqs$int.h1.explogx(0,t.cdf$x[1],ql,t.cdf$a.l,t.cdf$b.l)
+      lower.components[4] <- conc.ineqs$int.h1.const(t.cdf$x[t.cdf$n],ql,ql)-conc.ineqs$int.h1.expx(t.cdf$x[t.cdf$n],ql,ql,t.cdf$a.r,t.cdf$b.r) 
+    }
+    if(t.cdf$type=="nsd"){
+      lower.components[2] <- conc.ineqs$int.h1.expx(-Inf,t.cdf$x[1],ql,t.cdf$a.l,t.cdf$b.l)
+      lower.components[4] <- conc.ineqs$int.h1.const(t.cdf$x[t.cdf$n],min(0,ql),ql) - conc.ineqs$int.h1.explognegx(t.cdf$x[t.cdf$n],min(0,ql),ql,t.cdf$a.r,t.cdf$b.r)
+    }
+    
+    #lower.components[3] <- boole(t.cdf$x[1],t.cdf$x, conc.ineqs$h1(ql,t.cdf$x)*t.cdf$y) #Boole integral from t.cdf$x[1] to t.cdf$x[n]
+    lower.components[3] <- GaussQuadCDF(t.cdf$x[1], t.cdf$x[t.cdf$n], T, F.cdf, ql, qu, conc.ineqs) #Gauss Quad integral from t.cdf$x[1] to t.cdf$x[n]
+    
+  }
+  
+  if((ql > t.cdf$x[1]) & (ql <= t.cdf$x[t.cdf$n])){
+    
+    if(t.cdf$type=="ind"){
+      lower.components[2] <- conc.ineqs$int.h1.expx(-Inf,t.cdf$x[1],ql,t.cdf$a.l,t.cdf$b.l)
+    }
+    if(t.cdf$type=="psd"){
+      lower.components[2] <- conc.ineqs$int.h1.explogx(0,t.cdf$x[1],ql,t.cdf$a.l,t.cdf$b.l)
+    }
+    if(t.cdf$type=="nsd"){
+      lower.components[2] <- conc.ineqs$int.h1.expx(-Inf,t.cdf$x[1],ql,t.cdf$a.l,t.cdf$b.l)
+    }
+    
+    #lower.components[3] <- boole(ql,t.cdf$x, conc.ineqs$h1(ql,t.cdf$x)*t.cdf$y,int.to.right = F) #Boole integral from t.cdf$x[1] to t.cdf$x[n]
+    lower.components[3] <- GaussQuadCDF(t.cdf$x[1], ql, T, F.cdf, ql, qu, conc.ineqs) #Gauss Quad integral from t.cdf$x[1] to ql
+  }
+  
+  if(ql <= t.cdf$x[1]){
+    
+    if(t.cdf$type=="ind"){
+      lower.components[2] <- conc.ineqs$int.h1.expx(-Inf,ql,ql,t.cdf$a.l,t.cdf$b.l)
+    }
+    if(t.cdf$type=="psd"){
+      lower.components[2] <- conc.ineqs$int.h1.explogx(0,ql,ql,t.cdf$a.l,t.cdf$b.l)
+    }
+    if(t.cdf$type=="nsd"){
+      lower.components[2] <- conc.ineqs$int.h1.expx(-Inf,ql,ql,t.cdf$a.l,t.cdf$b.l)
+    }
+    
+  }
+  
+  lower.bound <- neumaierSum(lower.components)
+  
+  print(upper.components)
+  print(lower.components)
+  
+  # Make sure the results fall within [0,1]
+  
+  if(lower.bound < 0){lower.bound <- 0}
+  if(lower.bound > 1){lower.bound <- 1}
+  
+  if(upper.bound < 0){upper.bound <- 0}
+  if(upper.bound > 1){upper.bound <- 1}
+  
+  c(lower.bound,upper.bound)
+}
+
+evals <- abs(c(50,20,10,-9,-8,7,-6,5,4,3,2,1))
+
 t.cdf<-calc.QFcdf(evals=evals,n=2^16-1)
 
-der.conc.ineq <- function(z,nu,L,pole){
-  ifelse((z-pole) < nu*L, (z-pole)*exp(-0.5*((z-pole)^2)/nu)/nu,L*exp(0.5*nu*L^2-L*(z-pole)))
+nu <- 100
+L <- 1
+Er <- 3
+conc.ineqs<-WrapConcIneq.identity(Er,Er,nu,L)
+
+xx <- seq(t.cdf$x[1]+100,4000,len=200)
+F.cdf <- wrap.QFcdf(t.cdf)
+QFIntegrate3(2000,2000,t.cdf,conc.ineqs)
+yy<-sapply(xx,function(x){QFIntegrate3(x,x,t.cdf,conc.ineqs)})
+
+
+
+plot(xx,F.cdf(xx),type="l")
+lines(xx,yy[1,],col="blue")
+lines(xx,yy[2,],col="red")
+
+
+
+plot(xx,-F.cdf(xx,log.p = T,lower.tail = F)/log(10),type="l")
+points(xx,-log1p(-yy[2,])/log(10),type="l",col="red")
+points(xx,-log1p(-yy[1,])/log(10),type="l",col="blue")
+abline(v=xx[which.min(diff(yy[1,]))+1])
+
+
+conc.ineqs$int.h2.const(qu,Inf,qu)-conc.ineqs$int.h2.expx(qu,Inf,qu,t.cdf$a.r,t.cdf$b.r) 
+
+print(-log1p(-QFIntegrate3(xx[which.min(diff(yy[1,]))+1],xx[which.min(diff(yy[1,]))+1],t.cdf,conc.ineqs))/log(10),digits=22)
+
+xxx<-seq(xx[which.min(diff(yy[1,]))-4],xx[which.min(diff(yy[1,]))+4],len=500)
+zzz<-sapply(xxx,function(x){-log1p(-(GaussQuadCDF(t.cdf$x[1], t.cdf$x[t.cdf$n], T, F.cdf,x, x, conc.ineqs)+conc.ineqs$int.h1.const(t.cdf$x[t.cdf$n],x,x)-conc.ineqs$int.h1.expx(t.cdf$x[t.cdf$n],x,x,t.cdf$a.r,t.cdf$b.r)))/log(10) })
+
+zzz1<-sapply(xxx,function(x){-log1p(-(GaussQuadCDF(t.cdf$x[1], t.cdf$x[t.cdf$n], T, F.cdf,x, x, conc.ineqs)))/log(10) })
+
+zzz2<-sapply(xxx,function(x){-log1p(-(conc.ineqs$int.h1.const(t.cdf$x[t.cdf$n],x,x)-conc.ineqs$int.h1.expx(t.cdf$x[t.cdf$n],x,x,t.cdf$a.r,t.cdf$b.r)))/log(10) })
+
+zzz3<-sapply(xxx,function(x){GaussQuadCDF(t.cdf$x[1], t.cdf$x[t.cdf$n], T, F.cdf,x, x, conc.ineqs)+(conc.ineqs$int.h1.const(t.cdf$x[t.cdf$n],x,x)-conc.ineqs$int.h1.expx(t.cdf$x[t.cdf$n],x,x,t.cdf$a.r,t.cdf$b.r)) })
+
+#zzz<-sapply(xxx,function(x){-log10(GaussQuadCDF(t.cdf$x[1], t.cdf$x[t.cdf$n], T, F.cdf,x, x, conc.ineqs))})
+plot(xxx,zzz,type="l",ylim=c(0,12))
+lines(xxx,zzz1,col="green")
+lines(xxx,zzz2,col="orange")
+lines(xxx,zzz3,col="blue")
+plot(xxx,zzz3)
+
+zzz4<-sapply(xx,function(x){conc.ineqs$int.h2.const(x,Inf,x)})
+zzz5<-sapply(xx,function(x){conc.ineqs$int.h2.expx(x,Inf,x,t.cdf$a.r,t.cdf$b.r)})
+
+zzz6<-sapply(seq(0,10000,len=200),function(x){ -conc.ineqs$int.h2.expx(x,Inf,x,t.cdf$a.r,t.cdf$b.r)})# + conc.ineqs$int.h2.const(x,Inf,x) + (1-conc.ineqs$l(-conc.ineqs$c2))*F.cdf(x) })
+
+plot(seq(0,10000,len=200),-log10(-zzz6))
+
+
+
+abline(h=-log10(GaussQuadCDF(t.cdf$x[1], t.cdf$x[t.cdf$n], T, F.cdf,xx[which.min(diff(yy[1,]))+1], xx[which.min(diff(yy[1,]))+1], conc.ineqs)))
+abline(v=xx[which.min(diff(yy[1,]))+1])
+yyy<-sapply(xxx,function(x){GaussQuadCDF(t.cdf$x[1], t.cdf$x[t.cdf$n], T, F.cdf, x, x, conc.ineqs)})
+plot(-log10(yyy))
+plot(xxx,yyy,type="l")
+
+yyy<-sapply(xxx,function(x){conc.ineqs$int.h1.explogx(0,t.cdf$x[1],x,t.cdf$a.l,t.cdf$b.l)})
+plot(xxx,yyy)
+
+plot(xxx,yyy+zzz)
+abline()
+
+
+lines(xx,yy[2,],col="red")
+which(yy[2,]<F.cdf(xx))
+which(yy[1,]>F.cdf(xx))
+
+
+
+
+
+# 
+u <- function(x,nu,L) ifelse(x<0,1,ifelse(x < nu*L, exp(-0.5*(x^2)/nu), exp(0.5*nu*L^2-L*x)))
+u.prime <- function(x,nu,L) ifelse(x<0,0,ifelse(x < nu*L, -x*exp(-0.5*(x^2)/nu)/nu,-L*exp(0.5*nu*L^2-L*x)))
+# h1 <- function(t,a,nu,L) -u.prime(a-t,nu,L)
+# h2 <- function(t,a,nu,L) -u.prime(t-a,nu,L)
+l <- function(x,nu,L) ifelse(x>0,1,ifelse(x > -nu*L, exp(-0.5*(x^2)/nu), exp(0.5*nu*L^2+L*x)))
+# l.prime <- function(x,nu,L) ifelse(x>0,0,ifelse(x > -nu*L, -x*exp(-0.5*(x^2)/nu)/nu, L*exp(0.5*nu*L^2+L*x)))
+
+lower.bound <- function(q,nu,L,Er,F.cdf) (1-u(-Er,nu,L))*F.cdf(q) - integrate(function(x,nu,L,Er){F.cdf(q-Er-x)*u.prime(x,nu,L)},lower=max(-Er,0),upper=Inf,nu=nu,L=L,Er=Er,rel.tol = 1e-12)$value
+upper.bound <- function(q,nu,L,Er,F.cdf) (1-u(Er,nu,L))*F.cdf(q) - integrate(function(x,nu,L,Er){F.cdf(q-Er+x)*u.prime(x,nu,L)},lower=max(Er,0),upper=Inf,nu=nu,L=L,Er=Er,rel.tol=1e-12)$value
+
+lower.bound2 <- function(ql,nu,L,c1,F.cdf){
+  components <- rep(0,3)
+  components[1] <- (1-conc.ineqs$u(-c1))*F.cdf(ql)
+  components[2] <- integrate( function(t,ql){conc.ineqs$h1(ql,t)*F.cdf(t)}, lower=-Inf,upper=min(ql,ql-c1-sqrt(nu)),ql=ql)$value
+  if(ql > (ql-c1-sqrt(nu)) ){
+    components[3] <- integrate( function(t,ql){conc.ineqs$h1(ql,t)*F.cdf(t)}, lower=ql-c1-sqrt(nu),upper=min(ql,ql-c1),ql=ql)$value
+  }
+  sum(components)
 }
 
-Er <-0.1
-L<-2
-nu<-20
-q<-1
-
-# xx<-seq(q-Er,30,len=1000)
-# plot(xx,der.conc.ineq(xx,nu,L,q-Er),type="l")
-
-
-
-xxx<-seq(-50,50,len=1e3)
-test<-wrap.QFcdf(t.cdf)
-plot(xxx,test(xxx,lower.tail = T,log.p = T),type="l")
-
-
-
-
-
-QFIntegrate3<-function(q,t.cdf,log.conc.ineq,nu,L,Er){  # L= 1/(4*max(abs(lambda)))
-
-  # First we swivel around this pole
-  pole <- q - Er
-
-  upper.components <- lower.components <- rep(-Inf,4)
-
-  if(q<t.cdf$x[1]){
-
-    upper.components[1] <-  # Evaluate CDF at a point
-    upper.components[2] <- AnalyticBoundInt(t.cdf$a.l,t.cdf$b.l,q,t.cdf$x[t.cdf$index.l]) # gap from q to x[index.l] * bound
-    upper.components[3] <- AnalyticBoundInt(t.cdf$a.r,t.cdf$b.r,t.cdf$x[t.cdf$index.r],Inf) # x[index.r] to Inf * bound
-    upper.components[4] <- boole(t.cdf$x[t.cdf$index.l], t.cdf$x[t.cdf$index.l:t.cdf$index.r], exp(log(t.cdf$y[t.cdf$index.l:t.cdf$index.r])+log.conc.ineq.right(t.cdf$x[t.cdf$index.l:t.cdf$index.r],q,L,d,psi,nu)), int.to.right = T) # Middle * bound
-
-    lower.components[1] <- boole(t.cdf$x[t.cdf$index.l],t.cdf$x[t.cdf$index.l:t.cdf$index.r],t.cdf$y[t.cdf$index.l:t.cdf$index.r],int.to.right = T,one.minus = T) # Middle
-    lower.components[2] <- ExpInt(t.cdf$a.l,t.cdf$b.l,q,t.cdf$x[t.cdf$index.l]) # Left #
-    lower.components[3] <- ExpInt(t.cdf$a.r,t.cdf$b.r,t.cdf$x[t.cdf$index.r],Inf) # Right  # WE COULD REPLEACE THESE THREE TERMS WITH A LOWER BOUND ON CDF ON LEFT TAIL
-    lower.components[4] <- AnalyticBoundInt(t.cdf$a.l,t.cdf$b.l,-Inf,q,right=F) # -Inf to q * bound
-
+upper.bound2 <- function(qu,nu,L,c2,F.cdf){
+  components <- rep(0,3)
+  components[1] <- (1-conc.ineqs$l(-c2))*F.cdf(qu)
+  if(qu < (qu-c2+sqrt(nu)) ){
+    components[2] <- integrate( function(t,qu){conc.ineqs$h2(qu,t)*F.cdf(t)}, lower=max(qu,qu-c2),upper=(qu-c2+sqrt(nu)),qu=qu)$value
   }
+    components[3] <- integrate( function(t,qu){conc.ineqs$h2(qu,t)*F.cdf(t)}, lower=(qu-c2+sqrt(nu)),upper=Inf,qu=qu)$value
+  sum(components)
+}
 
-  if(q>t.cdf$x[t.cdf$index.r]){
+# system.time(lower.bound(-30,nu,L))
+# system.time(upper.bound(-30,nu,L))
+#
+# test(10)
+# (1-u(-Er))*test(-20)
+# unlist(integrate(function(x){test(x)*u.prime((-20-Er)-x)},lower=-Inf,upper=-20,rel.tol = 1e-10))
 
-    upper.components[1] <- ExpInt(t.cdf$a.l,t.cdf$b.l,-Inf,t.cdf$x[t.cdf$index.l]) # Left
-    upper.components[2] <- boole(t.cdf$x[t.cdf$index.l],t.cdf$x[t.cdf$index.l:t.cdf$index.r],t.cdf$y[t.cdf$index.l:t.cdf$index.r]) # Middle
-    upper.components[3] <- ExpInt(t.cdf$a.r,t.cdf$b.r,t.cdf$x[t.cdf$index.r],q) # Right
-    upper.components[4] <- AnalyticBoundInt(t.cdf$a.r,t.cdf$b.r,q,Inf) # q to Inf * bound
+wrapped.lower.bound<-function(x,nu,L,Er,F.cdf){tryCatch(
+  {lower.bound(x,nu,L,Er,F.cdf)},
+  error = function(e) NA,
+  warning = function(w) NA)}
 
-    lower.components[1] <- boole(t.cdf$x[t.cdf$index.l],t.cdf$x[t.cdf$index.l:t.cdf$index.r],exp(log(t.cdf$y[t.cdf$index.l:t.cdf$index.r])+log.conc.ineq.left(t.cdf$x[t.cdf$index.l:t.cdf$index.r],q,L,d,psi,nu)),int.to.right = T,one.minus = T) # Middle* bound
-    lower.components[2] <- ExpInt(t.cdf$a.r,t.cdf$b.r,q,Inf) # Right
-    lower.components[3] <- AnalyticBoundInt(t.cdf$a.r,t.cdf$b.r,t.cdf$x[t.cdf$index.r],q,right=F) # Right * bound
-    lower.components[4] <- AnalyticBoundInt(t.cdf$a.l,t.cdf$b.l,-Inf,t.cdf$x[t.cdf$index.l],right=F) # Left * bound
+wrapped.upper.bound<-function(x,nu,L,Er,F.cdf){tryCatch(
+  {upper.bound(x,nu,L,Er,F.cdf)},
+  error = function(e) NA,
+  warning = function(w) NA)}
 
-  }
-
-  if( t.cdf$x[t.cdf$index.l]<=q & q<=t.cdf$x[t.cdf$index.r] ){
-
-    upper.components[1] <- ExpInt(t.cdf$a.l,t.cdf$b.l,-Inf,t.cdf$x[t.cdf$index.l]) # Left
-    upper.components[2] <- boole(q,t.cdf$x[t.cdf$index.l:t.cdf$index.r],t.cdf$y[t.cdf$index.l:t.cdf$index.r],int.to.right = F) # Middle Left
-    upper.components[3] <- boole(q,t.cdf$x[t.cdf$index.l:t.cdf$index.r],t.cdf$y[t.cdf$index.l:t.cdf$index.r]*exp(log.conc.ineq.right(t.cdf$x[t.cdf$index.l:t.cdf$index.r],q,L,d,psi,nu)),int.to.right = T) # Middle Right * Bound
-    upper.components[4] <- AnalyticBoundInt(t.cdf$a.r,t.cdf$b.r,t.cdf$x[t.cdf$index.r],Inf) # Right * Bound
-
-    lower.components[1] <- boole(q,t.cdf$x[t.cdf$index.l:t.cdf$index.r],t.cdf$y[t.cdf$index.l:t.cdf$index.r],int.to.right = T,one.minus = T) # Middle Right
-    lower.components[2] <- ExpInt(t.cdf$a.r,t.cdf$b.r,t.cdf$x[t.cdf$index.r],Inf) # Right
-    lower.components[3] <- boole(q,t.cdf$x[t.cdf$index.l:t.cdf$index.r],t.cdf$y[t.cdf$index.l:t.cdf$index.r]*exp(log.conc.ineq.left(t.cdf$x[t.cdf$index.l:t.cdf$index.r],q,L,d,psi,nu)),int.to.right = F) # Middle Left
-    lower.components[4] <- AnalyticBoundInt(t.cdf$a.l,t.cdf$b.l,-Inf,t.cdf$x[t.cdf$index.l],right=F) # Left * bound
-
-  }
+yyy.upper <- sapply(xx,wrapped.upper.bound,nu=nu,L=L,Er=Er, F.cdf = F.cdf)
+yyy.lower <- sapply(xx,wrapped.lower.bound,nu=nu,L=L,Er=Er, F.cdf = F.cdf)
 
 
 
+wrapped.lower.bound2<-function(ql,nu,L,c1,F.cdf){tryCatch(
+  {lower.bound2(ql,nu,L,c1,F.cdf)},
+  error = function(e) NA,
+  warning = function(w) NA)}
 
+wrapped.upper.bound2<-function(qu,nu,L,c2,F.cdf){tryCatch(
+  {upper.bound2(qu,nu,L,c2,F.cdf)},
+  error = function(e) NA,
+  warning = function(w) NA)}
+
+xx<-seq(-1000,3000,len=300)
+
+yyy.upper2 <- sapply(xx,wrapped.upper.bound2,nu=nu,L=L,c2=Er, F.cdf = F.cdf)
+yyy.lower2 <- sapply(xx,wrapped.lower.bound2,nu=nu,L=L,c1=Er, F.cdf = F.cdf)
+
+lower.bound2(20,nu,L,Er,F.cdf)
+GaussQuadCDF(-Inf,20,lower.bound = T,F.cdf,20,20,conc.ineqs)
+
+
+plot(xx,F.cdf(xx),type="l")
+points(xx,yyy.upper2,type="l",col="red")
+points(xx,yyy.lower2,type="l",col="blue")
+
+plot(xx,-F.cdf(xx,log.p = T)/log(10),type="l")
+points(xx,-log10(yyy.upper2),type="l",col="red")
+points(xx,-log10(yyy.lower2),type="l",col="blue")
+
+plot(xx,-F.cdf(xx,log.p = T,lower.tail = F)/log(10),type="l")
+points(xx,-log10(1-yyy.upper2),type="l",col="red")
+points(xx,-log10(1-yyy.lower2),type="l",col="blue")
+
+any(F.cdf(xx)<yyy.lower2)
+any(F.cdf(xx)>yyy.upper2)
+
+plot(xxx,log10(test(xxx)-yyy.lower),col="blue",ylab="log10 Bound Distance from T CDF")
+points(xxx,log10(yyy.upper-test(xxx)),col="red")
+
+#Testing analytic ints
+
+evals <- abs(c(50,20,10,-9,-8,7,-6,5,4,3,2,1))
+
+t.cdf<-calc.QFcdf(evals=evals,n=2^16-1)
+F.cdf <- wrap.QFcdf(t.cdf)
+
+nu <- 10
+L <- 1
+Er <- 0.5
+conc.ineqs<-WrapConcIneq.identity(Er,Er,nu,L)
+
+xx <- seq(-1000,2000,len=1000)
+plot(xx,F.cdf(xx),type="l")
+
+xx<-seq(0,7,len=100)
+
+yy<-conc.ineqs$int.h1.expx(lower = 0, upper = 7,q = 3,a=t.cdf$a.l,b = t.cdf$b.l)
+
+plot(xx,yy,type="l")
+
+plot(xx,conc.ineqs$d.const(xx,12),type="l")
+plot(xx,conc.ineqs$d.expx(xx,upper=12,a=0.1,b=-0.2),type="l")
+plot(xx,conc.ineqs$d.explogx(xx,upper=12,a=0.1,b=-0.2),type="l")
+
+
+# Maybe no longer need this: If t.cdf is NSD, convert it to PSD (just need to flip results at the end)
+was.nsd <- F
+if(t.cdf$type=="nsd"){
+  was.nsd <- T
+  t.cdf$x <- -rev(t.cdf$x)
+  t.cdf$y <- 1-rev(t.cdf$y)
+  t.cdf$limit.r <- Inf
+  t.cdf$limit.l <- 0
+  a.r.2 <- t.cdf$a.l
+  b.r.2 <- -t.cdf$b.l
+  t.cdf$a.l <- t.cdf$a.r
+  t.cdf$b.l <- t.cdf$b.r
+  t.cdf$a.r <- a.r.2
+  t.cdf$b.r <- b.r.2
 }
 
 
-
-QFIntegrate2<-function(q, t.cdf, log.conc.ineq.left,log.conc.ineq.right, L, d, psi, nu){
-
-  upper.components <- lower.components <- rep(-Inf,4)
-
-  if(q<t.cdf$x[t.cdf$index.l]){
-
-    upper.components[1] <- ExpInt(t.cdf$a.l,t.cdf$b.l,-Inf,q) # upper bound on CDF
-    upper.components[2] <- AnalyticBoundInt(t.cdf$a.l,t.cdf$b.l,q,t.cdf$x[t.cdf$index.l]) # gap from q to x[index.l] * bound
-    upper.components[3] <- AnalyticBoundInt(t.cdf$a.r,t.cdf$b.r,t.cdf$x[t.cdf$index.r],Inf) # x[index.r] to Inf * bound
-    upper.components[4] <- boole(t.cdf$x[t.cdf$index.l], t.cdf$x[t.cdf$index.l:t.cdf$index.r], exp(log(t.cdf$y[t.cdf$index.l:t.cdf$index.r])+log.conc.ineq.right(t.cdf$x[t.cdf$index.l:t.cdf$index.r],q,L,d,psi,nu)), int.to.right = T) # Middle * bound
-
-    lower.components[1] <- boole(t.cdf$x[t.cdf$index.l],t.cdf$x[t.cdf$index.l:t.cdf$index.r],t.cdf$y[t.cdf$index.l:t.cdf$index.r],int.to.right = T,one.minus = T) # Middle
-    lower.components[2] <- ExpInt(t.cdf$a.l,t.cdf$b.l,q,t.cdf$x[t.cdf$index.l]) # Left #
-    lower.components[3] <- ExpInt(t.cdf$a.r,t.cdf$b.r,t.cdf$x[t.cdf$index.r],Inf) # Right  # WE COULD REPLEACE THESE THREE TERMS WITH A LOWER BOUND ON CDF ON LEFT TAIL
-    lower.components[4] <- AnalyticBoundInt(t.cdf$a.l,t.cdf$b.l,-Inf,q,right=F) # -Inf to q * bound
-
-    }
-
-  if(q>t.cdf$x[t.cdf$index.r]){
-
-    upper.components[1] <- ExpInt(t.cdf$a.l,t.cdf$b.l,-Inf,t.cdf$x[t.cdf$index.l]) # Left
-    upper.components[2] <- boole(t.cdf$x[t.cdf$index.l],t.cdf$x[t.cdf$index.l:t.cdf$index.r],t.cdf$y[t.cdf$index.l:t.cdf$index.r]) # Middle
-    upper.components[3] <- ExpInt(t.cdf$a.r,t.cdf$b.r,t.cdf$x[t.cdf$index.r],q) # Right
-    upper.components[4] <- AnalyticBoundInt(t.cdf$a.r,t.cdf$b.r,q,Inf) # q to Inf * bound
-
-    lower.components[1] <- boole(t.cdf$x[t.cdf$index.l],t.cdf$x[t.cdf$index.l:t.cdf$index.r],exp(log(t.cdf$y[t.cdf$index.l:t.cdf$index.r])+log.conc.ineq.left(t.cdf$x[t.cdf$index.l:t.cdf$index.r],q,L,d,psi,nu)),int.to.right = T,one.minus = T) # Middle* bound
-    lower.components[2] <- ExpInt(t.cdf$a.r,t.cdf$b.r,q,Inf) # Right
-    lower.components[3] <- AnalyticBoundInt(t.cdf$a.r,t.cdf$b.r,t.cdf$x[t.cdf$index.r],q,right=F) # Right * bound
-    lower.components[4] <- AnalyticBoundInt(t.cdf$a.l,t.cdf$b.l,-Inf,t.cdf$x[t.cdf$index.l],right=F) # Left * bound
-
-  }
-
-  if( t.cdf$x[t.cdf$index.l]<=q & q<=t.cdf$x[t.cdf$index.r] ){
-
-    upper.components[1] <- ExpInt(t.cdf$a.l,t.cdf$b.l,-Inf,t.cdf$x[t.cdf$index.l]) # Left
-    upper.components[2] <- boole(q,t.cdf$x[t.cdf$index.l:t.cdf$index.r],t.cdf$y[t.cdf$index.l:t.cdf$index.r],int.to.right = F) # Middle Left
-    upper.components[3] <- boole(q,t.cdf$x[t.cdf$index.l:t.cdf$index.r],t.cdf$y[t.cdf$index.l:t.cdf$index.r]*exp(log.conc.ineq.right(t.cdf$x[t.cdf$index.l:t.cdf$index.r],q,L,d,psi,nu)),int.to.right = T) # Middle Right * Bound
-    upper.components[4] <- AnalyticBoundInt(t.cdf$a.r,t.cdf$b.r,t.cdf$x[t.cdf$index.r],Inf) # Right * Bound
-
-    lower.components[1] <- boole(q,t.cdf$x[t.cdf$index.l:t.cdf$index.r],t.cdf$y[t.cdf$index.l:t.cdf$index.r],int.to.right = T,one.minus = T) # Middle Right
-    lower.components[2] <- ExpInt(t.cdf$a.r,t.cdf$b.r,t.cdf$x[t.cdf$index.r],Inf) # Right
-    lower.components[3] <- boole(q,t.cdf$x[t.cdf$index.l:t.cdf$index.r],t.cdf$y[t.cdf$index.l:t.cdf$index.r]*exp(log.conc.ineq.left(t.cdf$x[t.cdf$index.l:t.cdf$index.r],q,L,d,psi,nu)),int.to.right = F) # Middle Left
-    lower.components[4] <- AnalyticBoundInt(t.cdf$a.l,t.cdf$b.l,-Inf,t.cdf$x[t.cdf$index.l],right=F) # Left * bound
-
-  }
-
-
-  u.sign.vec <- rep(1,4)
-  u.norm.const <- max(upper.components)
-  u.res <- neumaierSum(u.sign.vec*exp(upper.components-u.norm.const))*exp(u.norm.const)
-  if(u.res < 0){u.res <- 0}
-  if(u.res > 1){u.res <- 1}
-
-  l.sign.vec <- c(1,-1,-1,-1)
-  l.norm.const <- max(lower.components)
-  l.res <- neumaierSum(l.sign.vec*exp(lower.components-l.norm.const))*exp(l.norm.const)
-  if(l.res < 0){l.res <- 0}
-  if(l.res > 1){l.res <- 1}
-
-  c(l.res,u.res)
-
-}
 
 
 
@@ -203,194 +691,32 @@ QFIntegrate2<-function(q, t.cdf, log.conc.ineq.left,log.conc.ineq.right, L, d, p
 # }
 
 
-# Boole Quadrature Method
-require(PreciseSums)
-boole<-function(a,x,y,int.to.right=T,one.minus=F){
-
-  # for int.to.right = T , this function integrates the function from a to max(x)
-  # for int.to.right = F , this function integrates from min(x) to a
-  # to obtain integral over the entire domain, just set a to min(x) and use int.to.right=T
-
-  n <- length(x)
-
-  # Swivel problem around the y axis if we need to go in the other direction
-  if(int.to.right==F){a <- - a ; x <- -rev(x) ; y <- rev(y)}
-
-  if(a>x[n]){stop("There are no evaluations of the function on the choosen interval of integration")}
-
-  left.remainder <- right.remainder <- inner.integral <- 0
-
-  # a.index is the index of the smallest element in x that is greater than or equal to a.
-  a.index <- findInterval(a,x,left.open = T)+1
-
-  if(x[a.index]!=a){
-    # Make trapezoid rule approximation to integrate from observed value to nearest larger grid point
-    left.remainder <- (y[a.index-1]+y[a.index])*(x[a.index]-a)/2
-  }
-
-  if(a.index!=n){
-
-    num.right.ragged.terms <- (n-a.index)%%4
-
-    if(num.right.ragged.terms==0){
-      right.remainder <- 0
-      last.index <- n
-    }else if(num.right.ragged.terms==1){
-      right.remainder <- (y[n]+y[n-1])*(x[n]-x[n-1])/2
-      last.index <- n-1
-    }else if(num.right.ragged.terms==2){
-      right.remainder <- (y[n]+4*y[n-1]+y[n-2])*(x[n]-x[n-2])/6
-      last.index <- n-2
-    }else if(num.right.ragged.terms==3){
-      right.remainder <- 3*(y[n]+3*y[n-1]+3*y[n-2]+y[n-3])*(x[n]-x[n-3])/8
-      last.index <- n-3
-    }
-  }
-
-  left.remainder.scaled <- left.remainder/((x[a.index+1]-x[a.index])*(2/45))
-  right.remainder.scaled <- right.remainder/((x[a.index+1]-x[a.index])*(2/45))
-
-
-  w<-c(14,32,12,32)
-
-  if(one.minus==F){
-
-    if(n-a.index >= 4){
-      vec<-c(w*y[a.index:(last.index-1)],7*y[last.index],-7*y[a.index],left.remainder.scaled,right.remainder.scaled)
-      norm.const <- 1/max(c(.Machine$double.eps, vec))
-      res <- (x[a.index+1]-x[a.index])*(2/45)*neumaierSum(c(vec*norm.const))/norm.const
-    }else{
-      vec<-c(left.remainder,right.remainder)
-      res <- neumaierSum(vec)
-    }
-
-  }else{
-
-    if(n-a.index >= 4){
-      vec<-c(45/(2*(x[a.index+1]-x[a.index])),-w*y[a.index:(last.index-1)],-7*y[last.index],7*y[a.index],
-             -left.remainder.scaled,-right.remainder.scaled)
-      norm.const <- 1/max(c(.Machine$double.eps, vec))
-      res <- (x[a.index+1]-x[a.index])*(2/45)*neumaierSum(c(vec/norm.const))*norm.const
-    }else{
-      vec<-c(1,-left.remainder,-right.remainder)
-      res <- neumaierSum(vec)
-      #res <- sum(sort(vec))
-    }
-
-
-  }
-
-  log(max(0,res))
-
-  # RC: We could consider trying to do the log sum exp trick with boole, restandardizing, with the hope of getting better precision
-  # if that doesn't work, maybe need to consider quad precision as an input to boole?
-
-}
-
-
-# # # Testing Boole
-# testfunc<-function(x){sin(x*10)/(10*x)}
-# xx<-seq(1,3,len=10000)
-# exp(boole(2,xx,testfunc(xx)))
-# integrate(f = testfunc,lower = 2,upper = 3,rel.tol = 1e-14)
-#
-#
-
-G1<-function(from,to,b){
-
-  # This performs the integral $ \int_\from^\to exp(-b*z) dz $ for any sign of a,b.
-
-  if(from==to){return(-Inf)}
-  if(to<from){stop("from must be less than or equal to to")}
-  if(b==0){warning("b is zero so we are just returning the integral of a constant function")
-    return(exp(-a)*(to-from))}
-  if(all(is.infinite(c(from,to)))){stop("both from and psi cannot be infinite")}
-  if(is.infinite(c(from)) & from>0){stop("from cannot be positive infinity")}
-  if(is.infinite(c(to)) & to<0){stop("from cannot be negative infinity")}
-
-  if(is.infinite(from)){
-    if(b>0){ stop("b cannot be positive when from is negative infinity --> integral does not converge")}
-    # b is negative
-    return(- log(abs(b)) - b * to)
-  }
-
-  if(is.infinite(to)){
-    if(b<0){ stop("b cannot be negative when to is infinity --> integral does not converge")}
-    # b is positive
-    return(- log(abs(b)) - b * from)
-  }
-
-  if(b>0){temp <- from }else{temp <- to}
-  -log(abs(b))+log(-expm1(-abs(b)*(to-from)))-b*temp
-}
-
-
-# #G1 is correct
-# print(-G1(-300,200,2)/log(10),digits=22)
-# print(-log(integrate(f=function(z,b){exp(-b*z)},lower = -300,upper = 200,b=2)$value)/log(10),digits=22)
-#
-
-G2 <- function(from, to, b, L){
-  if(from<=0){stop("from must be > 0")}
-  if(to<from){stop("to must be > from")}
-  if(to==from){return(-Inf)}
-  if(b>=1){stop("b must be < 1")}
-  -(1-b)*log(L)+pgamma(L*to,1-b,log.p = T)+lgamma(1-b) + log(-expm1(pgamma(L*from,1-b,log.p = T)- pgamma(L*to,1-b,log.p = T)))
-}
-
-G3 <- function(from, to, mu, nu ){
-  if(from<=0){stop("from must be > 0")}
-  if(to<from){stop("to must be > from")}
-  if(to==from){return(-Inf)}
-  if(nu<=0){stop("nu must be > 0")}
-
-  s<-sqrt(nu)
-  from.tilde<-(from - mu)/s
-  to.tilde<-(to - mu)/s
-## Finish this one
-  0.5*log(2*pi*nu) + log(s*(dnorm(to.tilde)-dnorm(from.tilde))/(pnorm(to.tilde)-pnorm(from.tilde))
-                         + mu*(pnorm(to.tilde)-pnorm(from.tilde)))
-}
-
-G4 <- function(from, to, b, nu ){
-  if(from<=0){stop("from must be > 0")}
-  if(to<from){stop("to must be > from")}
-  if(to==from){return(-Inf)}
-  if(b>=2){stop("b must be < 2")}
-
-  -log(2) + G2(from^2,to^2,b/2,1/(2*nu))
-}
-
-
-
-
-
 
 
 GaussInt<-function(a,b,from,to,k,nu){
-
+  
   if(from==to){return(-Inf)}
   if(to<from){stop("from must be less than or equal to to")}
   if(b==0){stop("b cannot be zero or else this is just an integral of a constant function")}
   if(all(is.infinite(c(from,to)))){stop("both from and psi cannot be infinite")}
   if(is.infinite(c(from)) & from>0){stop("from cannot be positive infinity")}
   if(is.infinite(c(to)) & to<0){stop("from cannot be negative infinity")}
-
+  
   prefix <- a + b^2*nu/2 - k*b + 0.5*log(2*pi*nu)
-
+  
   if(is.infinite(from)){
     if(b>0){ stop("b cannot be positive when from is negative infinity --> integral does not converge")}
     # b is negative
     return( prefix + pnorm((to-(k-b*nu))/sqrt(nu),log.p = T) )
   }
-
+  
   if(is.infinite(to)){
     if(b<0){ stop("b cannot be negative when to is infinity --> integral does not converge")}
     # b is positive
     return( prefix + pnorm((from-(k-b*nu))/sqrt(nu),log.p = T,lower.tail = F) )
   }
-
-
+  
+  
   prefix + pnorm((to-(k-b*nu))/sqrt(nu),log.p = T)
   + log(-expm1( pnorm((from-(k-b*nu))/sqrt(nu),log.p = T) - pnorm((to-(k-b*nu))/sqrt(nu),log.p = T) ))
 }
@@ -407,24 +733,24 @@ integrate(function(z,a,b,k,nu){exp(-0.5*((k-z)^2)/nu+a-b*z)},-100,100,a=1,b=4,k=
 
 
 AnalyticBoundInt<-function(a,b,from,to,right=T,q.=q,L.=L,d.=d,psi.=psi,nu.=nu){
-
+  
   if(from==to){return(-Inf)}
   if(to<from){stop("from must be less than or equal to to")}
   if(b==0){stop("b cannot be zero or else this is just an integral of a constant function")}
   if(all(is.infinite(c(from,to)))){stop("both from and psi cannot be infinite")}
   if(is.infinite(c(from)) & from>0){stop("from cannot be positive infinity")}
   if(is.infinite(c(to)) & to<0){stop("psi cannot be negative infinity")}
-
+  
   if(is.infinite(from) & b>0){ stop("b cannot be positive when from is negative infinity --> integral does not converge")}
-
+  
   if(is.infinite(to) & b<0){stop("b cannot be negative when to is infinity --> integral does not converge")}
-
+  
   # This must integrate exp(a-bz) * bound where bound may be in one of three stages (flat, gauss, or exp)
-
+  
   k.<-q.-psi.
-
+  
   rho <- as.integer(right)
-
+  
   if(right==T){
     const.interval <- c(-Inf, k.)
     gauss.interval <- c(k., nu./(4*d.)+k.)
@@ -434,76 +760,76 @@ AnalyticBoundInt<-function(a,b,from,to,right=T,q.=q,L.=L,d.=d,psi.=psi,nu.=nu){
     gauss.interval <- c(k.-nu./(4*d.), k.)
     exp.interval <- c(-Inf, k.-nu./(4*d.))
   }
-
+  
   const.component <- gauss.component <- exp.component <- -Inf
-
+  
   ##### Constant Component #####
-
+  
   # Interval inside region of integration
   if(from <= const.interval[1] & const.interval[2]<=to){
     const.component <- ExpInt(a,b,const.interval[1],const.interval[2])
   }
-
+  
   # Interval overlaps left part of region of integration
   if(const.interval[1] < from & from < const.interval[2] & const.interval[2] <= to){
     const.component <- ExpInt(a,b,from,const.interval[2])
   }
-
+  
   # Interval covers entire region of integration
   if(const.interval[1] < from & to < const.interval[2] ){
     const.component <- ExpInt(a,b,from,to)
   }
-
+  
   # Interval overlaps right part of region of integration
   if(from <= const.interval[1] & const.interval[1] < to & to < const.interval[2]){
     const.component <- ExpInt(a,b,const.interval[1],to)
   }
-
+  
   ##### Gauss Component #####
-
+  
   # Interval inside region of integration
   if(from <= gauss.interval[1] & gauss.interval[2]<=to){
     gauss.component <- GaussInt(a,b,gauss.interval[1],gauss.interval[2],k.,nu.)
   }
-
+  
   # Interval overlaps left part of region of integration
   if(gauss.interval[1] < from & from < gauss.interval[2] & gauss.interval[2] <= to){
     gauss.component <- GaussInt(a,b,from,gauss.interval[2],k.,nu.)
   }
-
+  
   # Interval covers entire region of integration
   if(gauss.interval[1] < from & to < gauss.interval[2] ){
     gauss.component <- GaussInt(a,b,from,to,k.,nu.)
   }
-
+  
   # Interval overlaps right part of region of integration
   if(from <= gauss.interval[1] & gauss.interval[1] < to & to < gauss.interval[2]){
     gauss.component <- GaussInt(a,b,gauss.interval[1],to,k.,nu.)
   }
-
-
+  
+  
   ##### Exp Component #####
-
+  
   # Interval inside region of integration
   if(from <= exp.interval[1] & exp.interval[2]<=to){
     exp.component <- ExpInt(a+0.5*nu./((4*d.)^2)+rho*k./(4*d.),b+rho/(4*d.),exp.interval[1],exp.interval[2])
   }
-
+  
   # Interval overlaps left part of region of integration
   if(exp.interval[1] < from & from < exp.interval[2] & exp.interval[2] <= to){
     exp.component <- ExpInt(a+0.5*nu./((4*d.)^2)+rho*k./(4*d.),b+rho/(4*d.),from,exp.interval[2])
   }
-
+  
   # Interval covers entire region of integration
   if(exp.interval[1] < from & to < exp.interval[2] ){
     exp.component <- ExpInt(a+0.5*nu./((4*d.)^2)+rho*k./(4*d.),b+rho/(4*d.),from,to)
   }
-
+  
   # Interval overlaps right part of region of integration
   if(from <= exp.interval[1] & exp.interval[1] < to & to < exp.interval[2]){
     exp.component <- ExpInt(a+0.5*nu./((4*d.)^2)+rho*k./(4*d.),b+rho/(4*d.),exp.interval[1],to)
   }
-
+  
   # Components are here in log space
   temp <- c(const.component,gauss.component,exp.component)
   norm.const <- max(temp)

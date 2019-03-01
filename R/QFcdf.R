@@ -86,6 +86,7 @@ log.rho.Q.easy.centered<-function(t,evals.s,ncps,a,mu.s){
                                         - 0.5*log(complex(real=1,imaginary=-2*t*evals.s))  )
 }
 
+require(RcppRoll)
 calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, qfft.apply = sapply) {
   # This function estimates the CDF of the truncated distribution with the identity function
   # as the function of interest
@@ -327,7 +328,6 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, qfft.apply 
        "a.r" = a.r,
        "b.r" = b.r)
 }
-
 
 QFcdf <- function(evals, ncps = rep(0,length(evals))){
 
