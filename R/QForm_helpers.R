@@ -1,5 +1,4 @@
 
-
 calc.R2<-function(yy,xx,interval.length){
 
   x.bar <- roll_mean(xx, interval.length)
@@ -77,7 +76,7 @@ extrapolate_tail<-function(log.cdf,xx.standardized,start,best,num.windows,right.
   #browser()
 
   list("b" = b,"best" = best,"successful"=T)
-}
+  }
 
 
 # This finds cdf for Y.s - mu.s where Y = \sum_i evals.s_i * (Z_i + \delta_i)^2
@@ -132,8 +131,8 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, qfft.apply 
   pos.semi.def <- all(evals.s>=0)
   neg.semi.def <- all(evals.s<=0)
 
-  if(pos.semi.def){type <- "psd"}
-  if(neg.semi.def){type <- "nsd"}
+  if(pos.semi.def){type <- "pos"}
+  if(neg.semi.def){type <- "neg"}
 
 
   # If neg.semi.definite, flip all eigenvalues to make it a PSD problem (flip back later)
@@ -265,7 +264,7 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, qfft.apply 
   # If we have both positive and negative eigenvalues
   if(!(pos.semi.def | neg.semi.def)){
 
-    type <-"ind"
+    type <-"mixed"
     limit.r <- Inf
     limit.l <- -Inf
 
@@ -326,280 +325,143 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, qfft.apply 
        "limit.r" = limit.r,
        "a.r" = a.r,
        "b.r" = b.r)
+  }
+
+eval.cdf.pos <- function(q, cdf, density = F, lower.tail = T, log.p = F){
+
+  if(density){
+
+    if(log.p){
+
+      return(ifelse(q < 0, 0, ifelse(q<cdf$x[1] & (!is.null(cdf$b.l)),suppressWarnings( log(-cdf$b.l)-(cdf$a.l + (cdf$b.l+1)*log(q)) ),
+                                     ifelse(q>cdf$x[cdf$n],log(cdf$b.r)-(cdf$a.r + cdf$b.r*q),
+                                            log(splinefun(cdf$x,cdf$y,method="mono")(q,deriv=1))))))
+    }else{
+
+      return(ifelse(q < 0, 0, ifelse(q<cdf$x[1] & (!is.null(cdf$b.l)),suppressWarnings( -cdf$b.l*exp(-(cdf$a.l + (cdf$b.l+1)*log(q))) ),
+                                     ifelse(q>cdf$x[cdf$n],cdf$b.r*exp(-(cdf$a.r + cdf$b.r*q)),
+                                            splinefun(cdf$x,cdf$y,method="mono")(q,deriv=1)))))
+    }
+
+  }else{
+
+    if(lower.tail & !log.p){
+      return(ifelse(q < 0, 0, ifelse(q<cdf$x[1] & (!is.null(cdf$b.l)),suppressWarnings( exp(-(cdf$a.l + cdf$b.l*log(q))) ),
+                                     ifelse(q>cdf$x[cdf$n],-expm1(-(cdf$a.r + cdf$b.r*q)),
+                                            splinefun(cdf$x,cdf$y,method="mono")(q)))))
+    }
+
+    if(!lower.tail & !log.p){
+      return(ifelse(q < 0, 1, ifelse(q<cdf$x[1] & (!is.null(cdf$b.l)),suppressWarnings( -expm1(-(cdf$a.l + cdf$b.l*log(q))) ),
+                                     ifelse(q>cdf$x[cdf$n],exp(-(cdf$a.r + cdf$b.r*q)),
+                                            1-splinefun(cdf$x,cdf$y,method="mono")(q)))))
+    }
+
+    if(lower.tail & log.p){
+      return(ifelse(q < 0, -Inf, ifelse(q<cdf$x[1] & (!is.null(cdf$b.l)),suppressWarnings( -(cdf$a.l + cdf$b.l*log(q)) ),
+                                        ifelse(q>cdf$x[cdf$n],log(-expm1(-(cdf$a.r + cdf$b.r*q))),
+                                               suppressWarnings(log(splinefun(cdf$x,cdf$y,method="mono")(q)))))))
+    }
+    if(!lower.tail & log.p){
+      return(ifelse(q < 0, 0, ifelse(q<cdf$x[1] & (!is.null(cdf$b.l)),suppressWarnings( log(-expm1(-(cdf$a.l + cdf$b.l*log(q))) )),
+                                     ifelse(q>cdf$x[cdf$n],-(cdf$a.r + cdf$b.r*q),
+                                            suppressWarnings(log1p(-splinefun(cdf$x,cdf$y,method="mono")(q)))))))
+    }
+  }
 }
 
+eval.cdf.neg <- function(q, cdf, density = F, lower.tail = T, log.p = F){
 
-QFcdf <- function(evals, ncps = rep(0,length(evals))){
+  if(density){
 
-  # Returns a function that will evaluate the CDF pointwise
-  cdf <- calc.QFcdf(evals = evals, ncps = ncps)
+    if(log.p){
 
-  wrap.QFcdf(cdf)
+      return(ifelse(q > 0, 0, ifelse(q < cdf$x[1],log(-cdf$b.l)-(cdf$a.l + cdf$b.l*q),
+                                     ifelse(q > cdf$x[cdf$n] & (!is.null(cdf$b.r)),suppressWarnings( log(-cdf$b.r)-(cdf$a.r + (cdf$b.r+1)*log(-q))),
+                                            log(splinefun(cdf$x,cdf$y,method="mono")(q, deriv=1))))))
+
+    }else{
+
+      return(ifelse(q > 0, 0, ifelse(q < cdf$x[1],-cdf$b.l*exp(-(cdf$a.l + cdf$b.l*q)),
+                                     ifelse(q > cdf$x[cdf$n] & (!is.null(cdf$b.r)),suppressWarnings( -cdf$b.r*exp(-(cdf$a.r + (cdf$b.r+1)*log(-q))) ),
+                                            splinefun(cdf$x,cdf$y,method="mono")(q, deriv=1)))))
+    }
+
+  }else{
+
+    if(lower.tail & !log.p){
+      return(ifelse(q > 0, 1, ifelse(q < cdf$x[1],exp(-(cdf$a.l + cdf$b.l*q)),
+                                     ifelse(q > cdf$x[cdf$n] & (!is.null(cdf$b.r)),suppressWarnings( -expm1(-(cdf$a.r + cdf$b.r*log(-q))) ),
+                                            splinefun(cdf$x,cdf$y,method="mono")(q)))))
+    }
+
+    if(!lower.tail & !log.p){
+      return(ifelse(q > 0, 0, ifelse(q < cdf$x[1],-expm1(-(cdf$a.l + cdf$b.l*q)),
+                                     ifelse(q > cdf$x[cdf$n] & (!is.null(cdf$b.r)),suppressWarnings( exp(-(cdf$a.r + cdf$b.r*log(-q))) ),
+                                            1-splinefun(cdf$x,cdf$y,method="mono")(q)))))
+    }
+
+    if(lower.tail & log.p){
+      return(ifelse(q > 0, 0, ifelse(q < cdf$x[1],-(cdf$a.l + cdf$b.l*q),
+                                     ifelse(q > cdf$x[cdf$n] & (!is.null(cdf$b.r)),suppressWarnings( log(-expm1(-(cdf$a.r + cdf$b.r*log(-q))) )),
+                                            suppressWarnings(log(splinefun(cdf$x,cdf$y,method="mono")(q)))))))
+    }
+    if(!lower.tail & log.p){
+      return(ifelse(q > 0, -Inf, ifelse(q < cdf$x[1],log(-expm1(-(cdf$a.l + cdf$b.l*q))),
+                                        ifelse(q > cdf$x[cdf$n] & (!is.null(cdf$b.r)),suppressWarnings( -(cdf$a.r + cdf$b.r*log(-q))),
+                                               suppressWarnings(log1p(-splinefun(cdf$x,cdf$y,method="mono")(q)))))))
+    }
+  }
+}
+
+eval.cdf.mixed <- function(q, cdf, density = F, lower.tail = T, log.p = F){
+
+  if(density){
+
+    if(log.p){
+
+      return(ifelse(q<cdf$x[1],log(-cdf$b.l)-(cdf$a.l + cdf$b.l*q),
+                    ifelse(q>cdf$x[cdf$n],log(cdf$b.r)-(cdf$a.r + cdf$b.r*q),
+                           log(splinefun(cdf$x,cdf$y,method="mono")(q,deriv=1)))))
+    }else{
+
+      return(ifelse(q<cdf$x[1],-cdf$b.l*exp(-(cdf$a.l + cdf$b.l*q)),
+                    ifelse(q>cdf$x[cdf$n],cdf$b.r*exp(-(cdf$a.r + cdf$b.r*q)),
+                           splinefun(cdf$x,cdf$y,method="mono")(q,deriv=1))))
+    }
+
+  }else{
+
+    if(lower.tail & !log.p){
+      return(ifelse(q<cdf$x[1],exp(-(cdf$a.l + cdf$b.l*q)),
+                    ifelse(q>cdf$x[cdf$n],-expm1(-(cdf$a.r + cdf$b.r*q)),
+                           splinefun(cdf$x,cdf$y,method="mono")(q))))
+    }
+
+    if(!lower.tail & !log.p){
+      return(ifelse(q<cdf$x[1],-expm1(-(cdf$a.l + cdf$b.l*q)),
+                    ifelse(q>cdf$x[cdf$n],exp(-(cdf$a.r + cdf$b.r*q)),
+                           1-splinefun(cdf$x,cdf$y,method="mono")(q))))
+    }
+
+    if(lower.tail & log.p){
+      return(ifelse(q<cdf$x[1],-(cdf$a.l + cdf$b.l*q),
+                    ifelse(q>cdf$x[cdf$n],suppressWarnings(log(-expm1(-(cdf$a.r + cdf$b.r*q)))),
+                           suppressWarnings(log(splinefun(cdf$x,cdf$y,method="mono")(q))))))
+    }
+    if(!lower.tail & log.p){
+      return(ifelse(q<cdf$x[1],suppressWarnings(log(-expm1(-(cdf$a.l + cdf$b.l*q)))),
+                    ifelse(q>cdf$x[cdf$n],-(cdf$a.r + cdf$b.r*q),
+                           suppressWarnings(log1p(-splinefun(cdf$x,cdf$y,method="mono")(q))))))
+    }
+  }
 }
 
 wrap.QFcdf <- function(cdf){
   # Returns a function that will evaluate the CDF pointwise
   switch(cdf$type,
-         ind =   function(q, lower.tail = T, log.p = F) eval.cdf.ind(q, cdf, lower.tail = lower.tail, log.p = log.p),
-         psd = function(q, lower.tail = T, log.p = F) eval.cdf.psd(q, cdf, lower.tail = lower.tail, log.p = log.p),
-         nsd = function(q, lower.tail = T, log.p = F) eval.cdf.nsd(q, cdf, lower.tail = lower.tail, log.p = log.p)
+         mixed =   function(q, density = F, lower.tail = T, log.p = F) eval.cdf.mixed(q, cdf, density = density, lower.tail = lower.tail, log.p = log.p),
+         pos = function(q, density = F, lower.tail = T, log.p = F) eval.cdf.pos(q, cdf, density = density, lower.tail = lower.tail, log.p = log.p),
+         neg = function(q, density = F, lower.tail = T, log.p = F) eval.cdf.neg(q, cdf, density = density, lower.tail = lower.tail, log.p = log.p)
   )
 }
-
-eval.cdf.psd <- function(q, cdf, lower.tail = T, log.p = F){
-
-  if(lower.tail & !log.p){
-    return(ifelse(q < 0, 0, ifelse(q<cdf$x[1],suppressWarnings( exp(-(cdf$a.l + cdf$b.l*log(q))) ),
-                                   ifelse(q>cdf$x[cdf$n],-expm1(-(cdf$a.r + cdf$b.r*q)),
-                                          splinefun(cdf$x,cdf$y,method="mono")(q)))))
-  }
-
-  if(!lower.tail & !log.p){
-    return(ifelse(q < 0, 1, ifelse(q<cdf$x[1],suppressWarnings( -expm1(-(cdf$a.l + cdf$b.l*log(q))) ),
-                                   ifelse(q>cdf$x[cdf$n],exp(-(cdf$a.r + cdf$b.r*q)),
-                                          1-splinefun(cdf$x,cdf$y,method="mono")(q)))))
-  }
-
-  if(lower.tail & log.p){
-    return(ifelse(q < 0, -Inf, ifelse(q<cdf$x[1],suppressWarnings( -(cdf$a.l + cdf$b.l*log(q)) ),
-                                      ifelse(q>cdf$x[cdf$n],log(-expm1(-(cdf$a.r + cdf$b.r*q))),
-                                             suppressWarnings(log(splinefun(cdf$x,cdf$y,method="mono")(q)))))))
-  }
-  if(!lower.tail & log.p){
-    return(ifelse(q < 0, 0, ifelse(q<cdf$x[1],suppressWarnings( log(-expm1(-(cdf$a.l + cdf$b.l*log(q))) )),
-                                   ifelse(q>cdf$x[cdf$n],-(cdf$a.r + cdf$b.r*q),
-                                          suppressWarnings(log1p(-splinefun(cdf$x,cdf$y,method="mono")(q)))))))
-  }
-}
-
-eval.cdf.nsd <- function(q, cdf, lower.tail = T, log.p = F){
-
-  if(lower.tail & !log.p){
-    return(ifelse(q > 0, 1, ifelse(q < cdf$x[1],exp(-(cdf$a.l + cdf$b.l*q)),
-                                   ifelse(q > cdf$x[cdf$n],suppressWarnings( -expm1(-(cdf$a.r + cdf$b.r*log(-q))) ),
-                                          splinefun(cdf$x,cdf$y,method="mono")(q)))))
-  }
-
-  if(!lower.tail & !log.p){
-    return(ifelse(q > 0, 0, ifelse(q < cdf$x[1],-expm1(-(cdf$a.l + cdf$b.l*q)),
-                                   ifelse(q > cdf$x[cdf$n],suppressWarnings( exp(-(cdf$a.r + cdf$b.r*log(-q))) ),
-                                          1-splinefun(cdf$x,cdf$y,method="mono")(q)))))
-  }
-
-  if(lower.tail & log.p){
-    return(ifelse(q > 0, 0, ifelse(q < cdf$x[1],-(cdf$a.l + cdf$b.l*q),
-                                   ifelse(q > cdf$x[cdf$n],suppressWarnings( log(-expm1(-(cdf$a.r + cdf$b.r*log(-q))) )),
-                                          suppressWarnings(log(splinefun(cdf$x,cdf$y,method="mono")(q)))))))
-  }
-  if(!lower.tail & log.p){
-    return(ifelse(q > 0, -Inf, ifelse(q < cdf$x[1],log(-expm1(-(cdf$a.l + cdf$b.l*q))),
-                                      ifelse(q > cdf$x[cdf$n],suppressWarnings( -(cdf$a.r + cdf$b.r*log(-q))),
-                                             suppressWarnings(log1p(-splinefun(cdf$x,cdf$y,method="mono")(q)))))))
-  }
-}
-
-eval.cdf.ind <- function(q, cdf, lower.tail = T, log.p = F){
-
-  if(lower.tail & !log.p){
-    return(ifelse(q<cdf$x[1],exp(-(cdf$a.l + cdf$b.l*q)),
-                  ifelse(q>cdf$x[cdf$n],-expm1(-(cdf$a.r + cdf$b.r*q)),
-                         splinefun(cdf$x,cdf$y,method="mono")(q))))
-  }
-
-  if(!lower.tail & !log.p){
-    return(ifelse(q<cdf$x[1],-expm1(-(cdf$a.l + cdf$b.l*q)),
-                  ifelse(q>cdf$x[cdf$n],exp(-(cdf$a.r + cdf$b.r*q)),
-                         1-splinefun(cdf$x,cdf$y,method="mono")(q))))
-  }
-
-  if(lower.tail & log.p){
-    return(ifelse(q<cdf$x[1],-(cdf$a.l + cdf$b.l*q),
-                  ifelse(q>cdf$x[cdf$n],suppressWarnings(log(-expm1(-(cdf$a.r + cdf$b.r*q)))),
-                         suppressWarnings(log(splinefun(cdf$x,cdf$y,method="mono")(q))))))
-  }
-  if(!lower.tail & log.p){
-    return(ifelse(q<cdf$x[1],suppressWarnings(log(-expm1(-(cdf$a.l + cdf$b.l*q)))),
-                  ifelse(q>cdf$x[cdf$n],-(cdf$a.r + cdf$b.r*q),
-                         suppressWarnings(log1p(-splinefun(cdf$x,cdf$y,method="mono")(q))))))
-  }
-}
-
-
-
-
-
-
-
-require(RcppRoll)
-# Indefinite Case
-######################
-system.time(t.cdf<-calc.QFcdf(evals=evals,n=2^16-1))
-plot(t.cdf$x,t.cdf$y,type="l",col="blue")
-# Look at extrapolation of right tail
-xx.r <- seq(test$x[c(test$n-10)],3*test$x[test$n]-test$x[c(test$n-10)],len=1000)
-plot(xx.r,-expm1(-(test$a.r+test$b.r*xx.r)),type="l")
-points(test$x[c(test$n-10):test$n],test$y[c(test$n-10):test$n])
-abline(h=1)
-# Look at extrapolation of left tail
-xx.l <- seq(4*test$x[1]-test$x[10],test$x[10],len=1000)
-plot(xx.l,exp(-(test$a.l+test$b.l*xx.l)),type="l")
-points(test$x[1:10],test$y[1:10])
-abline(h=0)
-
-
-# Positive Semi-definite Case
-######################
-system.time(test<-Tcdf2(evals=abs(evals),n=2^16-1))
-plot(test$x,test$y,type="l",col="blue")
-# Look at extrapolation of right tail
-xx.r <- seq(test$x[c(test$n-10)],3*test$x[test$n]-test$x[c(test$n-10)],len=1000)
-plot(xx.r,-expm1(-(test$a.r+test$b.r*xx.r)),type="l")
-points(test$x[c(test$n-10):test$n],test$y[c(test$n-10):test$n])
-abline(h=1)
-# Look at extrapolation of left tail
-xx.l <- seq(0,test$x[10],len=1000)
-plot(xx.l,exp(-(test$a.l+test$b.l*log(xx.l))),type="l")
-points(test$x[1:10],test$y[1:10])
-abline(h=0)
-test$b.l
-
-# Negative Semi-definite Case
-######################
-system.time(test<-Tcdf2(evals=-abs(evals),n=2^16-1))
-plot(test$x,test$y,type="l",col="blue")
-# Look at extrapolation of right tail
-xx.r <- seq(test$x[c(test$n-10)],0,len=1000)
-plot(xx.r,-expm1(-(test$a.r+test$b.r*(log(abs(xx.r))))),type="l")
-points(test$x[c(test$n-10):test$n],test$y[c(test$n-10):test$n])
-abline(h=1)
-# Look at extrapolation of left tail
-xx.l <- seq(2.2*test$x[1]-test$x[10],test$x[10],len=1000)
-plot(xx.l,exp(-(test$a.l+test$b.l*xx.l)),type="l")
-points(test$x[1:10],test$y[1:10])
-abline(h=0)
-
-
-
-#######
-# Lets look at these extrapolation lines on the log scale when appropriate below
-#######
-# Plot Right Tail
-if(is.infinite(test$limit.r)){
-  plot(test$x,-log1p(-test$y),type="l",col="blue",ylim=c(0,30),xlim=c(min(test$x),max(test$x)+((max(test$x)-min(test$x))/4)), lwd=2)
-  abline(test$a.r,test$b.r,lty=2)
-}else{
-  plot(-log(abs(test$x)),-log1p(-test$y),type="l",col="blue")#,ylim=c(0,30),xlim=c(min(test$x),max(test$x)+((max(test$x)-min(test$x))/4)), lwd=2)
-  abline(test$a.r,test$b.r,lty=2)
-}
-
-# Plot Left Trail
-if(is.infinite(test$limit.l)){
-  plot(test$x,-log(test$y),type="l",col="blue",lwd=2)
-  abline(test$a.l,test$b.l,lty=2)
-}else{
-  plot(log(test$x),-log(test$y),type="l",col="blue",lwd=2)
-  abline(test$a.l,test$b.l,lty=2)
-}
-
-
-
-# Gotta come back and make sure that former best.l are not discarded and also implement
-# the interpolation back to 0.
-
-
-
-
-
-
-
-
-
-
-
-#
-#
-# log.rho.gamma<-function(t,alpha,beta,a){
-#   complex(imaginary = -t*a)-alpha*log(complex(real=1,imaginary = -t/beta))
-# }
-#
-# # THIS WORKS!
-# log.rho.Q.easy<-function(t,evals,ncps,a){
-#   complex(imaginary = -t*a)+sum( complex(imaginary=ncps*t*evals)/complex(real=1,imaginary=-2*t*evals) - 0.5*log(complex(real=1,imaginary=-2*t*evals))  )
-# }
-#
-# a.standardized <- -1e6
-# b.standardized <- 1e6
-# n<-2^16-1
-#
-# evals<-l.e.vals
-# ncps<-rep(0,length(evals))
-#
-# rho <- sapply(1:n, function(k, a.standardized, b.standardized, n, evals, ncps) {
-#   exp(log.rho.Q.easy((pi*n/(b.standardized-a.standardized))*(2*((k-1)/n)-1), evals,ncps, a.standardized)) / (pi*(2*((k-1)/n)-1))
-# }, a.standardized = a.standardized, b.standardized = b.standardized, n = n, evals = evals, ncps = ncps)
-#
-# # Perform FFT
-# fft_cdf <- 0.5 - (Im(fft(rho))*(-1)^(0:(n-1)))/n
-# xx.standardized <- seq(a.standardized, b.standardized-(b.standardized-a.standardized)/n, length.out = n)
-# #plot(xx.standardized,pgamma(xx.standardized,shape = alpha,rate=beta),type="l")
-# lines(xx.standardized,fft_cdf,col="blue")
-#
-# ##########################
-#
-# # Trial below with centering and scaling
-#
-# s<-sqrt(max(2*(1+2*ncps)*(evals^2)))
-# evals.s <- evals/s
-# mu.s <- sum((ncps+1)*evals)/s
-#
-# # This finds cdf for Y.s - mu.s (both have been scaled by s)
-# log.rho.Q.easy.centered<-function(t,evals.s,ncps,a,mu.s){
-#   complex(imaginary = -t*(a+mu.s))+sum( complex(imaginary=ncps*t*evals.s)/complex(real=1,imaginary=-2*t*evals.s) - 0.5*log(complex(real=1,imaginary=-2*t*evals.s))  )
-# }
-#
-# a.standardized <- -1e3
-# b.standardized <- 1e3
-# n<-2^16-1
-#
-# rho <- sapply(1:n, function(k, a.standardized, b.standardized, n, evals.s, ncps,mu.s) {
-#   exp(log.rho.Q.easy.centered((pi*n/(b.standardized-a.standardized))*(2*((k-1)/n)-1), evals.s,ncps, a.standardized,mu.s)) / (pi*(2*((k-1)/n)-1))
-# }, a.standardized = a.standardized, b.standardized = b.standardized, n = n, evals.s = evals.s, ncps = ncps, mu.s = mu.s)
-#
-# # Perform FFT
-# fft_cdf.centered <- 0.5 - (Im(fft(rho))*(-1)^(0:(n-1)))/n
-# xx.centered <- seq(a.standardized, b.standardized-(b.standardized-a.standardized)/n, length.out = n)*s + mu.s*s
-# #plot(xx.standardized,pgamma(xx.standardized,shape = alpha,rate=beta),type="l")
-# lines(xx.centered,fft_cdf.centered,col="blue")
-#
-#
-# #
-#
-#
-#
-#
-#
-#
-#
-#
-#
-# log.rho.func<-function(t,phi,ncps,a){
-#   lp1<-log1p((t*phi)^2)
-#   Omega<-exp(log(ncps)+2*log(abs(t*phi))-lp1)
-#   complex(real=-0.5*sum(Omega+lp1),imaginary = -t*a-0.5*sum((Omega+1)*t*phi-atan(t*phi)))
-# }
-#
-# rho.old <- sapply(1:n, function(k, a.standardized, b.standardized, n, evals, ncps) {
-#   exp(log.rho.func((pi*n/(b.standardized-a.standardized))*(2*((k-1)/n)-1), 2*evals,ncps, a.standardized)) / (pi*(2*((k-1)/n)-1))
-# }, a.standardized = a.standardized, b.standardized = b.standardized, n = n, evals = evals, ncps = ncps)
-#
-# # Perform FFT
-# fft_cdf.old <- 0.5 - (Im(fft(rho.old))*(-1)^(0:(n-1)))/n
-# #plot(xx.standardized,pgamma(xx.standardized,shape = alpha,rate=beta),type="l")
-# lines(xx.standardized+E,fft_cdf.old,col="red")
-#
-#
-# # Wowza these agree!!!
-#
-
-
-

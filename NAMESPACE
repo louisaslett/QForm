@@ -1,12 +1,5 @@
-useDynLib(QForm)
-
 exportPattern("^[[:alpha:]]+")
-
-importFrom("CompQuadForm", "davies")
-importClassesFrom("Matrix", "dsyMatrix", "dgeMatrix")
-importMethodsFrom("Matrix", "diag", "crossprod")
-importFrom("Rcpp", "evalCpp")
-importFrom("RSpectra", "eigs")
-importFrom("stats", "optimize")
-importFrom("glue", "glue")
+importFrom("stats", "integrate")
 importFrom("RcppRoll", "roll_mean", "roll_sd")
+export(QBounds)
+export(QForm)

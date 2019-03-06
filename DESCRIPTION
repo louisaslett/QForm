@@ -1,24 +1,14 @@
 Package: QForm
 Type: Package
-Title: Bounding and simulation of quadratic form probabilities
+Title: Methods for Scalable Screening with Quadratic Functions of Normal Random Variables
 Version: 0.1.0
-Authors@R: c(person("Louis J. M.", "Aslett", email = "louis@louisaslett.com", role = c("aut", "cre")),
-            person("Ryan", "Christ", email = "ryan.christ@st-hildas.ox.ac.uk", role = c("aut")))
+Authors@R: c(person("Louis J. M.", "Aslett", email = "louis@louisaslett.com", role = c("aut","cre")), person("Ryan", "Christ", email = "rchrist@wustl.edu", role = c("aut")))
 Maintainer: Louis J. M. Aslett <louis@louisaslett.com>
-Description: Provides implementations of upper and lower bounds on the CDF of
-  a quadratic form in arbitrary independent real random variables.  Efficient
-  exact simulation methods forthcoming.
-License: GPL-2
+Description: Provides methods for screening with test statistics of the form. upper and lower bounds on the tail probabilities of quadratic forms in Gaussians.  These bounds CDF/PDF is obtained via the FFT based on the same transform as Davies' method. \deqn{(A,B) = (Q S Z^H, Q T Z^H)}{(A,B) = (Q*S*Z^H, Q*T*Z^H)}
+License: GPL-3
 Encoding: UTF-8
 LazyData: true
-Imports: CompQuadForm,
-  Matrix,
-  Rcpp (>= 0.12.9),
-  RSpectra,
-  stats,
-  glue,
-  RcppEigen,
-  BH,
+Imports: stats,
   RcppRoll
-LinkingTo: Rcpp, Rmpfr, RcppEigen, BH
-RoxygenNote: 6.1.0
+LinkingTo: Rcpp
+RoxygenNote: 6.1.1
