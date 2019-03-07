@@ -1,5 +1,4 @@
-exportPattern("^[[:alpha:]]+")
-importFrom("stats", "integrate")
+importFrom("stats", "integrate", "fft")
 importFrom("RcppRoll", "roll_mean", "roll_sd")
 export(QBounds)
 export(QForm)

@@ -460,8 +460,8 @@ eval.cdf.mixed <- function(q, cdf, density = F, lower.tail = T, log.p = F){
 wrap.QFcdf <- function(cdf){
   # Returns a function that will evaluate the CDF pointwise
   switch(cdf$type,
-         mixed =   function(q, density = F, lower.tail = T, log.p = F) eval.cdf.mixed(q, cdf, density = density, lower.tail = lower.tail, log.p = log.p),
-         pos = function(q, density = F, lower.tail = T, log.p = F) eval.cdf.pos(q, cdf, density = density, lower.tail = lower.tail, log.p = log.p),
-         neg = function(q, density = F, lower.tail = T, log.p = F) eval.cdf.neg(q, cdf, density = density, lower.tail = lower.tail, log.p = log.p)
+         mixed =   function(x, density = F, lower.tail = T, log.p = F) eval.cdf.mixed(x, cdf, density = density, lower.tail = lower.tail, log.p = log.p),
+         pos = function(x, density = F, lower.tail = T, log.p = F) eval.cdf.pos(x, cdf, density = density, lower.tail = lower.tail, log.p = log.p),
+         neg = function(x, density = F, lower.tail = T, log.p = F) eval.cdf.neg(x, cdf, density = density, lower.tail = lower.tail, log.p = log.p)
   )
 }

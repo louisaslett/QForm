@@ -1,27 +1,34 @@
-#'  Quadratic Form Bounds
+#' CDF/PDF for a Quadratic Form in Gaussians
 #'
-#' Compute upper and lower bounds on the CDF of a quadratic form in normal random variables.
+#' Returns the CDF and/or PDF for random variables \eqn{T_f}{T_f} of the form \deqn{T_f = \sum\limits_i f\left(\eta_i \right) \left(Z_i + \delta_i)^2}{T_f = \Sigma_i f (\eta_i) (Z_i + \delta_i)^2} where \eqn{Z_i \sim N(0,1).}{Z_i ~ N(0,1).}
 #'
-#' Gory details....
+#' The returned function has three optional, logical arguments.  The first is a \code{density}, which when \code{TRUE}, prompts the function to evaluate the PDF rather than the CDF.  \code{density} defaults to FALSE.  \code{lower.tail} returns 1 minus the CDF when \code{TRUE} (not used if \code{density}==TRUE) and is highly recommended for those interested in the upper tail of \eqn{T_f}.  \code{log.p} returns the desired probabilities in log space.
 #'
-#' @param obs vector; observed values of the quadratic form for which upper and lower bounds on the CDF
-#' @param qf.cdf QForm cdf object; output of QFcdf for some set of coefficients and ncps
-#' @param fun character string; function to be applied to coefficients.  Current options: "identity","power","exponential"
-#' @param fun.args list; list of function arguments required for the corresponding function type provided in fun
-#' @param lower.tail logical; if \code{TRUE} (default), probability is \eqn{P(y^T M y \le obs)}, otherwise \eqn{P(y^T M y > obs)}
-#' @param log logical; if \code{TRUE}, probability \eqn{p} is given as \eqn{log(p)}
+#' \code{n} is the number of sub-intervals used in the left-sided Reimann integral approximation of the Fourier transform carried out by \code{stats::fft}.  The default 2^16-1 should work for the vast majority of cases, but n may need to be increased to achieve accurate CDF estimation when \eqn{T_f} has many terms (when \code{f.eta} is long).
 #'
-#' @return A data frame containing the variables lower and upper which provide the bounds on the CDF of the quadratic form.
+#' Since \code{stats::fft} can only evaluate the CDF up to double precision, we extrapolate the tails of \eqn{T_f}.  QForm automatically detects the region where the estimated CDF begins to lose precision.  A log-linear function is used for tails that go out to infinity and a log-monomial functions is used for tails truncated at 0 (when all of the \code{f.eta} have the same sign).  These extrapolated tails, motivated by the form of the characteristic function, provide accurate approximations in most cases when compared against a quad-precision implementation (not yet included in \code{QForm}).
+#'
+#' @param f.eta vector; real-valued coefficients, \eqn{f(\eta_i)}, (may be positive or negative)
+#' @param delta vector; mean shifts for each \eqn{Z_i}
+#' @param n numeric; number of points at which to evaluate the characteristic function of \eqn{T_f}, must be odd (see Details).
+#'
+#' @return A function that evaluates the CDF or PDF of \eqn{T_f}.
 #'
 #' @examples
-#' # Some code here which runs a self-contained example
+#' x <- seq(-100,100)
+#' cdf <- QForm(c(-12,-7,1,1,3,10))
+#'
+#' plot(x,cdf(x),type="l") # CDF
+#' plot(x,cdf(x, density=T),type="l") # PDF
+#' plot(x,-cdf(x,log.p=T)/log(10),type="l") # lower tail of CDF
+#' plot(x,-cdf(x,lower.tail = F, log.p = T)/log(10),type="l") # upper tail of CDF
 #'
 #' @export
 
-QForm <- function(lambda, delta = rep(0,length(lambda)), n = 2^16-1){
+QForm <- function(f.eta, delta = rep(0,length(f.eta)), n = 2^16-1){
 
   if(n%%2==0){stop("n must be odd")}
-  cdf <- calc.QFcdf(evals = lambda, ncps = delta^2, n = n)
+  cdf <- calc.QFcdf(evals = f.eta, ncps = delta^2, n = n)
   cdf.func <- wrap.QFcdf(cdf)
   attr(cdf.func,"tail.features") <- list("lambda.signs" = cdf$type,
                                          "extrapolation.point.l" = cdf$x[1],
