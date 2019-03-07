@@ -1,6 +1,6 @@
-#' CDF/PDF for a Quadratic Form in Gaussians
+#' CDF/PDF of a Quadratic Form in Gaussians
 #'
-#' Returns the CDF and/or PDF for random variables \eqn{T_f}{T_f} of the form \deqn{T_f = \sum\limits_i f\left(\eta_i \right) \left(Z_i + \delta_i)^2}{T_f = \Sigma_i f (\eta_i) (Z_i + \delta_i)^2} where \eqn{Z_i \sim N(0,1).}{Z_i ~ N(0,1).}
+#' Returns the CDF and PDF for random variables \eqn{T_f}{T_f} of the form \deqn{T_f = \sum\limits_i f\left(\eta_i \right) \left(Z_i + \delta_i)^2}{T_f = \Sigma_i f (\eta_i) (Z_i + \delta_i)^2} where \eqn{Z_i \sim N(0,1).}{Z_i ~ N(0,1).}
 #'
 #' The returned function has three optional, logical arguments.  The first is a \code{density}, which when \code{TRUE}, prompts the function to evaluate the PDF rather than the CDF.  \code{density} defaults to FALSE.  \code{lower.tail} returns 1 minus the CDF when \code{TRUE} (not used if \code{density}==TRUE) and is highly recommended for those interested in the upper tail of \eqn{T_f}.  \code{log.p} returns the desired probabilities in log space.
 #'
@@ -15,17 +15,21 @@
 #' @return A function that evaluates the CDF or PDF of \eqn{T_f}.
 #'
 #' @examples
-#' x <- seq(-100,100)
-#' cdf <- QForm(c(-12,-7,1,1,3,10))
+#' cdf <- QFGauss(c(-12, -7, 1, 1, 3, 10, 14))
 #'
-#' plot(x,cdf(x),type="l") # CDF
-#' plot(x,cdf(x, density=T),type="l") # PDF
-#' plot(x,-cdf(x,log.p=T)/log(10),type="l") # lower tail of CDF
-#' plot(x,-cdf(x,lower.tail = F, log.p = T)/log(10),type="l") # upper tail of CDF
+#' x <- seq(-400, 400, len = 1e3)
+#'
+#' plot(x, cdf(x), type = "l", ylab = "CDF") # plot CDF
+#' plot(x, cdf(x, density = TRUE), type = "l", ylab = "PDF") # plot PDF
+#'
+#' plot(x, -cdf(x, log.p = TRUE)/log(10), type = "l",
+#'  ylab = expression(-log[10](CDF)) ) # plot lower tail of CDF
+#' plot(x, -cdf(x, lower.tail = FALSE, log.p = TRUE)/log(10), type = "l",
+#'  ylab = expression(-log[10](1 - CDF))) # plot upper tail of CDF
 #'
 #' @export
 
-QForm <- function(f.eta, delta = rep(0,length(f.eta)), n = 2^16-1){
+QFGauss <- function(f.eta, delta = rep(0,length(f.eta)), n = 2^16-1){
 
   if(n%%2==0){stop("n must be odd")}
   cdf <- calc.QFcdf(evals = f.eta, ncps = delta^2, n = n)

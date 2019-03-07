@@ -1,4 +1,4 @@
-importFrom("stats", "integrate", "fft")
+importFrom("stats", "integrate", "fft", "dnorm", "pgamma", "pnorm", "sd", "splinefun", "uniroot")
 importFrom("RcppRoll", "roll_mean", "roll_sd")
-export(QBounds)
-export(QForm)
+export(QFGaussBounds)
+export(QFGauss)

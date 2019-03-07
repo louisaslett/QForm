@@ -1,5 +1,8 @@
 
-# Declare Header Functions
+###################################
+# Essential Integration Functions #
+###################################
+
 G1<-function(from,to,b){
 
   n1 <- length(from)
@@ -15,7 +18,7 @@ G1<-function(from,to,b){
   if(any(is.infinite(from)) & b > 0){stop("b cannot be positive when from is negative infinity --> integral does not converge")}
   if(any(is.infinite(to)) & b < 0){stop("b cannot be negative when to is infinity --> integral does not converge")}
 
-  ifelse(to<=from, -Inf, ifelse(rep(b,n)==0,-a+log(to-from),-log(abs(b))+log(-expm1(-abs(b)*(to-from)))-b*ifelse(rep(b,n)>0,from,to)))
+  ifelse(to<=from, -Inf, ifelse(rep(b,n)==0,log(to-from),-log(abs(b))+log(-expm1(-abs(b)*(to-from)))-b*ifelse(rep(b,n)>0,from,to)))
 }
 #G1 is correct
 #print(-G1(-20:-10,Inf,2)/log(10),digits=22)
@@ -32,8 +35,8 @@ G2 <- function(from, to, b, L){
   n2 <- length(from)
   n <- max(n1,n2)
   ifelse(to<=from,-Inf,ifelse(rep(L,n)<0,
-                              Vectorize(function(from,to,b,L){log(integrate(f=function(z,b,L){z^(-b)*exp(-L*z)},lower = from,upper = to,b=b,L=L)$value)},vectorize.args = c("from","to"))(from, to, b, L)
-                              ,-(1-b)*log(L)+pgamma(L*to,1-b,log.p = T)+lgamma(1-b) + (from >0)*log(-expm1(pgamma(L*from,1-b,log.p = T)- pgamma(L*to,1-b,log.p = T)))))
+                              Vectorize(function(from,to,b,L){log(integrate(f=function(z,b,L){z^(-b)*exp(-L*z)},lower = from,upper = to,b=b,L=L,rel.tol = 1e-20,stop.on.error = FALSE)$value)},vectorize.args = c("from","to"))(from, to, b, L)
+                              ,-(1-b)*log(L)+pgamma(L*to,1-b,log.p = TRUE)+lgamma(1-b) + (from >0)*log(-expm1(pgamma(L*from,1-b,log.p = TRUE)- pgamma(L*to,1-b,log.p = TRUE)))))
 }
 #G2 is correct
 # print(G2(0,c(0.1,0.2),-3,-10),digits=22)
@@ -47,7 +50,7 @@ G3 <- function(from, to, mu, nu ){
   s<-sqrt(nu)
   from.tilde <- (from - mu)/s
   to.tilde <- (to - mu)/s
-  ifelse(to<=from,-Inf,0.5*log(2*pi*nu) + pnorm(to.tilde,log.p = T) + log(-expm1(pnorm(from.tilde,log.p = T)-pnorm(to.tilde,log.p = T))))
+  ifelse(to<=from,-Inf,0.5*log(2*pi*nu) + pnorm(to.tilde,log.p = TRUE) + log(-expm1(pnorm(from.tilde,log.p = TRUE)-pnorm(to.tilde,log.p = TRUE))))
 }
 # #G3 is correct
 #print(exp(G3(lower.prime,upper.prime,q-c2-b*nu,nu)),digits=22)
@@ -96,6 +99,12 @@ G5 <- function(from, to, b, nu ){
 # print(exp(G5(-5,0:10,-2,2)),digits=22)
 # print(integrate(f=function(z,b,nu){z^(1-b)*exp(-0.5*z^2/nu)},lower = 1,upper = 4,b=-20,nu=.02)$value,digits=22)
 
+
+
+###################################
+# WrapConcIneq for identity f     #
+###################################
+
 WrapConcIneq.identity <- function(c1,c2,nu,L){
 
   if(!all(is.numeric(c(c1,c2,nu,L)))){
@@ -141,7 +150,7 @@ WrapConcIneq.identity <- function(c1,c2,nu,L){
 
       t.func <- function(t,q,c1,b,nu) { (q-c1-t)*t^(-b) * dnorm(t, mean = q-c1, sd = sqrt(nu)) }
 
-      (lower.prime < upper.prime)*exp(-a)*sqrt(2*pi/nu)*Vectorize(function(f,lower,upper,q,c1,b,nu){integrate(f = f, lower = lower, upper = upper, q = q, c1 = c1, b = b, nu = nu)$value},vectorize.args = c("lower","upper"))(t.func, lower.prime, upper.prime, q, c1, b, nu)
+      (lower.prime < upper.prime)*exp(-a)*sqrt(2*pi/nu)*Vectorize(function(f,lower,upper,q,c1,b,nu){integrate(f = f, lower = lower, upper = upper, q = q, c1 = c1, b = b, nu = nu,rel.tol = 1e-20,stop.on.error = F)$value},vectorize.args = c("lower","upper"))(t.func, lower.prime, upper.prime, q, c1, b, nu)
       + (lower < upper.prime.prime)*L*exp(0.5*nu*L^2-(q-c1)*L-a+G2(lower, upper.prime.prime, b, -L))
     },
     "int.h1.explognegx" = function(lower, upper, q, a, b){
@@ -152,7 +161,7 @@ WrapConcIneq.identity <- function(c1,c2,nu,L){
 
       z.func <- function(z,q,c1,b,nu) { (q-c1+z)*z^(-b) * dnorm(z, mean = q-c1, sd = sqrt(nu)) }
 
-      (lower.prime < upper.prime)*exp(-a)*sqrt(2*pi/nu)*Vectorize(function(f,lower,upper,q,c1,b,nu){integrate(f = f, lower = lower, upper = upper, q = q, c1 = c1, b = b, nu = nu)$value},vectorize.args = c("lower","upper"))(z.func, -upper.prime, -lower.prime, q, c1, b, nu)
+      (lower.prime < upper.prime)*exp(-a)*sqrt(2*pi/nu)*Vectorize(function(f,lower,upper,q,c1,b,nu){integrate(f = f, lower = lower, upper = upper, q = q, c1 = c1, b = b, nu = nu,rel.tol = 1e-20,stop.on.error = F)$value},vectorize.args = c("lower","upper"))(z.func, -upper.prime, -lower.prime, q, c1, b, nu)
       + (lower < upper.prime.prime)*L*exp(0.5*nu*L^2-(q-c1)*L-a+G2(-upper.prime.prime,-lower, b, L))
     },
     "c2" = c2,
@@ -179,7 +188,7 @@ WrapConcIneq.identity <- function(c1,c2,nu,L){
 
       t.func <- function(t,q,c2,b,nu) { (c2-q+t)*t^(-b) * dnorm(t, mean = q-c2, sd = sqrt(nu)) }
 
-      (lower.prime < upper.prime)*exp(-a)*sqrt(2*pi/nu)*Vectorize(function(f,lower,upper,q,c2,b,nu){integrate(f = f, lower = lower, upper = upper, q = q, c2 = c2, b = b, nu = nu)$value},vectorize.args = c("lower","upper"))(t.func, lower.prime, upper.prime, q, c2, b, nu)
+      (lower.prime < upper.prime)*exp(-a)*sqrt(2*pi/nu)*Vectorize(function(f,lower,upper,q,c2,b,nu){integrate(f = f, lower = lower, upper = upper, q = q, c2 = c2, b = b, nu = nu,rel.tol = 1e-20,stop.on.error = F)$value},vectorize.args = c("lower","upper"))(t.func, lower.prime, upper.prime, q, c2, b, nu)
       + (lower.prime.prime < upper)*L*exp(0.5*nu*L^2+(q-c2)*L-a+G2(lower.prime.prime, upper, b, L))
     },
     "int.h2.explognegx" = function(lower, upper, q, a, b){
@@ -200,13 +209,17 @@ WrapConcIneq.identity <- function(c1,c2,nu,L){
 
       z.func <- function(z,q,c2,b,nu) { (c2-q-z)*z^(-b) * dnorm(z, mean = c2-q, sd = sqrt(nu)) }
 
-      (lower.prime < upper.prime)*exp(-a)*sqrt(2*pi/nu)*Vectorize(function(f,lower,upper,q,c2,b,nu){integrate(f = f, lower = lower, upper = upper, q = q, c2 = c2, b = b, nu = nu)$value},vectorize.args = c("lower","upper"))(z.func, -upper.prime, -lower.prime, q, c2, b, nu)
+      (lower.prime < upper.prime)*exp(-a)*sqrt(2*pi/nu)*Vectorize(function(f,lower,upper,q,c2,b,nu){integrate(f = f, lower = lower, upper = upper, q = q, c2 = c2, b = b, nu = nu,rel.tol = 1e-20,stop.on.error = F)$value},vectorize.args = c("lower","upper"))(z.func, -upper.prime, -lower.prime, q, c2, b, nu)
       + (lower.prime.prime < upper)*L*exp(0.5*nu*L^2-(c2-q)*L-a+G2(-upper,-lower.prime.prime, b, -L))
     }
   )
 }
 
-GaussQuadCDF<-function(from, to, lower.bound = T, cdf,ql,qu,conc.ineqs){
+######################################
+# Gauss Quadrature for "body" of CDF #
+######################################
+
+GaussQuadCDF<-function(from, to, lower.bound = TRUE, cdf,ql,qu,conc.ineqs){
 
   # This function integrates the "body" of the CDF against a function h.
   # Since h has a given mode that we don't want the Gauss quadrature routine to miss, we divide the integral into two regions of
@@ -221,19 +234,19 @@ GaussQuadCDF<-function(from, to, lower.bound = T, cdf,ql,qu,conc.ineqs){
 
   if(lower.bound){
     if(from < (ql-c1-sqrt(nu)))
-      components[1] <- integrate( function(t,ql){conc.ineqs$h1(ql,t)*cdf(t)}, lower=from,upper=min(to,ql-c1-sqrt(nu)),ql=ql,rel.tol = 1e-10)$value
+      components[1] <- integrate( function(t,ql){conc.ineqs$h1(ql,t)*cdf(t)}, lower=from,upper=min(to,ql-c1-sqrt(nu)),ql=ql,rel.tol = 1e-20,stop.on.error = FALSE)$value
     if(to > (ql-c1-sqrt(nu)) & from < (ql-c1) ){
-      components[2] <- integrate( function(t,ql){conc.ineqs$h1(ql,t)*cdf(t)}, lower=max(ql-c1-sqrt(nu),from),upper=min(to,ql-c1),ql=ql,rel.tol=1e-10)$value
+      components[2] <- integrate( function(t,ql){conc.ineqs$h1(ql,t)*cdf(t)}, lower=max(ql-c1-sqrt(nu),from),upper=min(to,ql-c1),ql=ql,rel.tol=1e-20,stop.on.error = FALSE)$value
     }
   }
 
   if(!lower.bound){
 
     if((from < (qu-c2+sqrt(nu))) & (to > qu-c2) ){
-      components[1] <- integrate( function(t,qu){conc.ineqs$h2(qu,t)*cdf(t)}, lower=max(from,qu-c2),upper=min(to,qu-c2+sqrt(nu)),qu=qu,rel.tol = 1e-10)$value
+      components[1] <- integrate( function(t,qu){conc.ineqs$h2(qu,t)*cdf(t)}, lower=max(from,qu-c2),upper=min(to,qu-c2+sqrt(nu)),qu=qu,rel.tol = 1e-20,stop.on.error = FALSE)$value
     }
     if(to > (qu-c2+sqrt(nu)))
-      components[2] <- integrate( function(t,qu){conc.ineqs$h2(qu,t)*cdf(t)}, lower=max(from,qu-c2+sqrt(nu)),upper=to,qu=qu,rel.tol = 1e-10)$value
+      components[2] <- integrate( function(t,qu){conc.ineqs$h2(qu,t)*cdf(t)}, lower=max(from,qu-c2+sqrt(nu)),upper=to,qu=qu,rel.tol = 1e-20,stop.on.error = FALSE)$value
   }
 
   sum(components)

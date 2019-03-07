@@ -1,3 +1,7 @@
+##########################################
+# Essential functions for performing FFT #
+# and extrapolation                      #
+##########################################
 
 calc.R2<-function(yy,xx,interval.length){
 
@@ -44,11 +48,11 @@ fft.croppper3<-function(r2,interval.length,num.baseline.intervals){
     }
   }
   # For added robustness, don't take the linear interval that is furthest out, but the one that is second to the furthest out
-  sort(win.select,decreasing = T)[2]-1
+  sort(win.select,decreasing = TRUE)[2]-1
 
 }
 
-extrapolate_tail<-function(log.cdf,xx.standardized,start,best,num.windows,right.side=T){
+extrapolate_tail<-function(log.cdf,xx.standardized,start,best,num.windows,right.side=TRUE){
 
   side<-2*as.integer(right.side)-1
 
@@ -75,11 +79,9 @@ extrapolate_tail<-function(log.cdf,xx.standardized,start,best,num.windows,right.
   #a <- log.cdf[best]-xx.standardized[best]*b
   #browser()
 
-  list("b" = b,"best" = best,"successful"=T)
+  list("b" = b,"best" = best,"successful"=TRUE)
   }
 
-
-# This finds cdf for Y.s - mu.s where Y = \sum_i evals.s_i * (Z_i + \delta_i)^2
 log.rho.Q.easy.centered<-function(t,evals.s,ncps,a,mu.s){
   complex(imaginary = -t*(a+mu.s))+sum( complex(imaginary=ncps*t*evals.s)/complex(real=1,imaginary=-2*t*evals.s)
                                         - 0.5*log(complex(real=1,imaginary=-2*t*evals.s))  )
@@ -234,7 +236,7 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, qfft.apply 
   if(pos.semi.def | neg.semi.def){
     limit.l <- 0
     limit.r <- Inf
-    right.tail<-extrapolate_tail(log.cdf.r,xx.standardized,ctstart.r,best.r,num.windows=20,right.side=T)
+    right.tail<-extrapolate_tail(log.cdf.r,xx.standardized,ctstart.r,best.r,num.windows=20,right.side=TRUE)
 
     if(right.tail$successful){
       best.r<-right.tail$best
@@ -245,7 +247,7 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, qfft.apply 
     }
 
     if( best.l != 1 ){
-      left.tail<-extrapolate_tail(log.cdf.l,log(xx.standardized+mu.s),ctstart.l,best.l,num.windows=20,right.side=F)
+      left.tail<-extrapolate_tail(log.cdf.l,log(xx.standardized+mu.s),ctstart.l,best.l,num.windows=20,right.side=FALSE)
 
       if(left.tail$successful){
         best.l<-left.tail$best
@@ -268,8 +270,8 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, qfft.apply 
     limit.r <- Inf
     limit.l <- -Inf
 
-    left.tail<-extrapolate_tail(log.cdf.l,xx.standardized,ctstart.l,best.l,num.windows=20,right.side=F)
-    right.tail<-extrapolate_tail(log.cdf.r,xx.standardized,ctstart.r,best.r,num.windows=20,right.side=T)
+    left.tail<-extrapolate_tail(log.cdf.l,xx.standardized,ctstart.l,best.l,num.windows=20,right.side=FALSE)
+    right.tail<-extrapolate_tail(log.cdf.r,xx.standardized,ctstart.r,best.r,num.windows=20,right.side=TRUE)
 
     if(left.tail$successful){
       best.l<-left.tail$best
@@ -327,7 +329,12 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, qfft.apply 
        "b.r" = b.r)
   }
 
-eval.cdf.pos <- function(q, cdf, density = F, lower.tail = T, log.p = F){
+
+##############################################
+# Functions for returning a CDF/PDF function #
+##############################################
+
+eval.cdf.pos <- function(q, cdf, density = FALSE, lower.tail = TRUE, log.p = FALSE){
 
   if(density){
 
@@ -370,7 +377,7 @@ eval.cdf.pos <- function(q, cdf, density = F, lower.tail = T, log.p = F){
   }
 }
 
-eval.cdf.neg <- function(q, cdf, density = F, lower.tail = T, log.p = F){
+eval.cdf.neg <- function(q, cdf, density = FALSE, lower.tail = TRUE, log.p = FALSE){
 
   if(density){
 
@@ -414,7 +421,7 @@ eval.cdf.neg <- function(q, cdf, density = F, lower.tail = T, log.p = F){
   }
 }
 
-eval.cdf.mixed <- function(q, cdf, density = F, lower.tail = T, log.p = F){
+eval.cdf.mixed <- function(q, cdf, density = FALSE, lower.tail = TRUE, log.p = FALSE){
 
   if(density){
 
@@ -460,8 +467,8 @@ eval.cdf.mixed <- function(q, cdf, density = F, lower.tail = T, log.p = F){
 wrap.QFcdf <- function(cdf){
   # Returns a function that will evaluate the CDF pointwise
   switch(cdf$type,
-         mixed =   function(x, density = F, lower.tail = T, log.p = F) eval.cdf.mixed(x, cdf, density = density, lower.tail = lower.tail, log.p = log.p),
-         pos = function(x, density = F, lower.tail = T, log.p = F) eval.cdf.pos(x, cdf, density = density, lower.tail = lower.tail, log.p = log.p),
-         neg = function(x, density = F, lower.tail = T, log.p = F) eval.cdf.neg(x, cdf, density = density, lower.tail = lower.tail, log.p = log.p)
+         mixed =   function(x, density = FALSE, lower.tail = TRUE, log.p = FALSE) eval.cdf.mixed(x, cdf, density = density, lower.tail = lower.tail, log.p = log.p),
+         pos = function(x, density = FALSE, lower.tail = TRUE, log.p = FALSE) eval.cdf.pos(x, cdf, density = density, lower.tail = lower.tail, log.p = log.p),
+         neg = function(x, density = FALSE, lower.tail = TRUE, log.p = FALSE) eval.cdf.neg(x, cdf, density = density, lower.tail = lower.tail, log.p = log.p)
   )
 }
