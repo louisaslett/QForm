@@ -8,6 +8,9 @@
 #'
 #' Since \code{stats::fft} can only evaluate the CDF up to double precision, we extrapolate the tails of \eqn{T_f}.  QForm automatically detects the region where the estimated CDF begins to lose precision.  A log-linear function is used for tails that go out to infinity and a log-monomial functions is used for tails truncated at 0 (when all of the \code{f.eta} have the same sign).  These extrapolated tails, motivated by the form of the characteristic function, provide accurate approximations in most cases when compared against a quad-precision implementation (not yet included in \code{QForm}).
 #'
+#' A note on unbounded densities: The density of \eqn{T_f} if guaranteed to be bounded if length(f.eta) > 2 and there is no trouble in density estimation posed by asymptotes.  In the length(f.eta)==2 case, if the two components of f.eta are of opposite signs, then the density of \eqn{T_f}{T_f} may have an asymptote at some value \eqn{t}{t}.  While the density in the neighborhood around that \eqn{t} should be accurately calculated, due to the FFT and spline interpolation approach used, the density reported at \eqn{t}{t} may be reported as some finite rather than as Inf.  In the length(f.eta)==1 case, QFGauss resorts to dchisq and the density at 0 is accurately reported as Inf.
+#'
+#'
 #' @param f.eta vector; real-valued coefficients, \eqn{f(\eta_i)}, (may be positive or negative)
 #' @param delta vector; mean shifts for each \eqn{Z_i}
 #' @param n numeric; number of points at which to evaluate the characteristic function of \eqn{T_f}, must be odd (see Details).
@@ -15,11 +18,18 @@
 #' @return A function that evaluates the CDF or PDF of \eqn{T_f}.
 #'
 #' @examples
-#' cdf <- QFGauss(c(-12, -7, 1, 1, 3, 10, 14))
+#' f.eta <- c(-12, -7, 5, 7, -9, 10, 8)
+#' delta <- c(2, 10, -4, 3, 8, -5, -12)
 #'
-#' x <- seq(-400, 400, len = 1e3)
+#' cdf <- QFGauss(f.eta, delta)
 #'
-#' plot(x, cdf(x), type = "l", ylab = "CDF") # plot CDF
+#' 1e3 samples from target distribution
+#' samps <- c(colSums(f.eta * (matrix(rnorm(1e3 * length(f.eta)), nrow = length(f.eta)) + delta)^2))
+#'
+#' x <- seq(-1500, 2000, len = 1e3)
+#' plot(x,ecdf(samps)(x),type="l") # ECDF
+#' lines(x,cdf(x),col="blue") # CDF as calculated by QForm
+#'
 #' plot(x, cdf(x, density = TRUE), type = "l", ylab = "PDF") # plot PDF
 #'
 #' plot(x, -cdf(x, log.p = TRUE)/log(10), type = "l",
@@ -32,6 +42,37 @@
 QFGauss <- function(f.eta, delta = rep(0,length(f.eta)), n = 2^16-1){
 
   if(n%%2==0){stop("n must be odd")}
+
+  if(length(f.eta)!=length(delta)){stop("delta does not have the same length as f.eta.")}
+
+  if(all(f.eta==0)){stop("All f.eta are zero.")}
+
+
+  if(all(f.eta==f.eta[1])){
+
+    df <- length(f.eta)
+
+    return(
+      function(q, density = FALSE, lower.tail = TRUE, log.p = FALSE){
+        C <- abs(f.eta[1])
+        if(density){
+          if(log.p){
+            return( dchisq((2*(f.eta[1]>0)-1)*q/C,df,sum(delta^2),TRUE)-log(C) )
+          }else{
+            return( dchisq((2*(f.eta[1]>0)-1)*q/C,df,sum(delta^2))/C )
+          }
+        }else{
+          if(f.eta[1] > 0){
+            return( pchisq(q/C,df,sum(delta^2),lower.tail,log.p) )
+          }else{
+            return( pchisq(-q/C,df,sum(delta^2),!lower.tail,log.p) )
+
+          }
+        }
+      }
+    )
+  }
+
   cdf <- calc.QFcdf(evals = f.eta, ncps = delta^2, n = n)
   cdf.func <- wrap.QFcdf(cdf)
   attr(cdf.func,"tail.features") <- list("lambda.signs" = cdf$type,

@@ -150,9 +150,9 @@ WrapConcIneq.identity <- function(c1,c2,nu,L){
       upper.prime <- pmin(upper,q-c1)
       upper.prime.prime <- pmin(upper,q-c1-nu*L)
 
-      t.func <- function(t,q,c1,b,nu) { (q-c1-t)*t^(-b) * dnorm(t, mean = q-c1, sd = sqrt(nu)) }
+      t.func <- function(t,q,c1,b,nu) { (q-c1-t)*exp(-0.5*((t-(q-c1))^2)/nu - b*log(t)-a-log(nu)) }
 
-      A <- ifelse(lower.prime < upper.prime, exp(-a)*sqrt(2*pi/nu)*Vectorize(function(f,lower,upper,q,c1,b,nu){integrate(f = f, lower = lower, upper = upper, q = q, c1 = c1, b = b, nu = nu,rel.tol = 1e-20,stop.on.error = F)$value},vectorize.args = c("lower","upper"))(t.func, lower.prime, upper.prime, q, c1, b, nu), 0)
+      A <- ifelse(lower.prime < upper.prime, Vectorize(function(f,lower,upper,q,c1,b,nu){integrate(f = f, lower = lower, upper = upper, q = q, c1 = c1, b = b, nu = nu,rel.tol = 1e-20,stop.on.error = F)$value},vectorize.args = c("lower","upper"))(t.func, lower.prime, upper.prime, q, c1, b, nu), 0)
       B <- ifelse(lower < upper.prime.prime, L*exp(0.5*nu*L^2-(q-c1)*L-a+G2(lower, upper.prime.prime, b, -L)), 0)
       A + B
     },
@@ -162,9 +162,9 @@ WrapConcIneq.identity <- function(c1,c2,nu,L){
       upper.prime <- pmin(upper,q-c1)
       upper.prime.prime <- pmin(upper,q-c1-nu*L)
 
-      z.func <- function(z,q,c1,b,nu) { (q-c1+z)*z^(-b) * dnorm(z, mean = q-c1, sd = sqrt(nu)) }
+      z.func <- function(z,q,c1,b,nu) { (q-c1+z)*exp(-0.5*((z-(q-c1))^2)/nu - b*log(z) - a - log(nu))}
 
-      A <- ifelse(lower.prime < upper.prime, exp(-a)*sqrt(2*pi/nu)*Vectorize(function(f,lower,upper,q,c1,b,nu){integrate(f = f, lower = lower, upper = upper, q = q, c1 = c1, b = b, nu = nu,rel.tol = 1e-20,stop.on.error = F)$value},vectorize.args = c("lower","upper"))(z.func, -upper.prime, -lower.prime, q, c1, b, nu), 0)
+      A <- ifelse(lower.prime < upper.prime, Vectorize(function(f,lower,upper,q,c1,b,nu){integrate(f = f, lower = lower, upper = upper, q = q, c1 = c1, b = b, nu = nu,rel.tol = 1e-20,stop.on.error = F)$value},vectorize.args = c("lower","upper"))(z.func, -upper.prime, -lower.prime, q, c1, b, nu), 0)
       B <- ifelse(lower < upper.prime.prime, L*exp(0.5*nu*L^2-(q-c1)*L-a+G2(-upper.prime.prime,-lower, b, L)), 0)
       A + B
     },
@@ -192,9 +192,9 @@ WrapConcIneq.identity <- function(c1,c2,nu,L){
       upper.prime <- pmin(upper,q-c2+nu*L)
       lower.prime.prime <- pmax(lower,q-c2+nu*L)
 
-      t.func <- function(t,q,c2,b,nu) { (c2-q+t)*t^(-b) * dnorm(t, mean = q-c2, sd = sqrt(nu)) }
+      t.func <- function(t,q,c2,b,nu) { (c2-q+t)*exp(-0.5*((t-(q-c2))^2)/nu - b*log(t)-a-log(nu)) }
 
-      A <- ifelse(lower.prime < upper.prime, exp(-a)*sqrt(2*pi/nu)*Vectorize(function(f,lower,upper,q,c2,b,nu){integrate(f = f, lower = lower, upper = upper, q = q, c2 = c2, b = b, nu = nu,rel.tol = 1e-20,stop.on.error = F)$value},vectorize.args = c("lower","upper"))(t.func, lower.prime, upper.prime, q, c2, b, nu), 0)
+      A <- ifelse(lower.prime < upper.prime, Vectorize(function(f,lower,upper,q,c2,b,nu){integrate(f = f, lower = lower, upper = upper, q = q, c2 = c2, b = b, nu = nu,rel.tol = 1e-20,stop.on.error = F)$value},vectorize.args = c("lower","upper"))(t.func, lower.prime, upper.prime, q, c2, b, nu), 0)
       B <- ifelse(lower.prime.prime < upper, L*exp(0.5*nu*L^2+(q-c2)*L-a+G2(lower.prime.prime, upper, b, L)), 0)
       A + B
     },
@@ -205,9 +205,9 @@ WrapConcIneq.identity <- function(c1,c2,nu,L){
       upper.prime <- pmin(upper,q-c2+nu*L)
       lower.prime.prime <- pmax(lower,q-c2+nu*L)
 
-      z.func <- function(z,q,c2,b,nu) { (c2-q-z)*z^(-b) * dnorm(z, mean = c2-q, sd = sqrt(nu)) }
+      z.func <- function(z,q,c2,b,nu) { (c2-q-z)*exp(-0.5*((z-(c2-q))^2)/nu - b*log(z)-a-log(nu))}
 
-      A <- ifelse(lower.prime < upper.prime, exp(-a)*sqrt(2*pi/nu)*Vectorize(function(f,lower,upper,q,c2,b,nu){integrate(f = f, lower = lower, upper = upper, q = q, c2 = c2, b = b, nu = nu,rel.tol = 1e-20,stop.on.error = F)$value},vectorize.args = c("lower","upper"))(z.func, -upper.prime, -lower.prime, q, c2, b, nu), 0)
+      A <- ifelse(lower.prime < upper.prime, Vectorize(function(f,lower,upper,q,c2,b,nu){integrate(f = f, lower = lower, upper = upper, q = q, c2 = c2, b = b, nu = nu,rel.tol = 1e-20,stop.on.error = F)$value},vectorize.args = c("lower","upper"))(z.func, -upper.prime, -lower.prime, q, c2, b, nu), 0)
       B <- ifelse(lower.prime.prime < upper, L*exp(0.5*nu*L^2-(c2-q)*L-a+G2(-upper,-lower.prime.prime, b, -L)), 0)
       A + B
     }

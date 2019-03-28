@@ -20,20 +20,23 @@
 #'
 #' @examples
 #'
-#' cdf <- QFGauss(c(-12, -7, 1, 1, 3, 10, 14))
+#' f.eta <- c(-12, -7, 5, 7, -9, 10, 8)
+#' delta <- c(2, 10, -4, 3, 8, -5, -12)
 #'
-#' x <- seq(-150, 150, len = 1e3)
+#' cdf <- QFGauss(f.eta, delta)
 #'
 #' bounds <- QFGaussBounds(cdf = cdf, f = "identity",
-#'                         max.abs.eta = 10, sum.eta = 1, sum.etasq = 100)
+#'                         max.abs.eta = 10, sum.eta = 5, sum.etasq = 200)
 #'
-#' xx <- seq(-150, 150, len = 8)
+#' xx <- seq(-1e3, 1e3, len = 6)
 #' ## This may take 5 - 10 secs.
 #' y <- as.data.frame(t(mapply(bounds, ql = xx-1, qu = xx+1)))
 #'
+#' x <- seq(-1e3, 1e3, len = 1e3)
 #' plot(x, cdf(x), type = "l")
-#' points(xx, y$lower, col = "blue"); lines(xx, y$lower, col="blue", lty = 2)
-#' points(xx, y$upper, col = "red"); lines(xx, y$upper, col = "red", lty = 2)
+#'
+#' points(xx, y$lower, col = "blue")
+#' points(xx, y$upper, col = "red")
 #'
 #' @export
 
