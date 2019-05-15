@@ -8,6 +8,7 @@ Description: QForm provides upper and lower bounds on p-values for test statisti
 License: GPL-3
 Encoding: UTF-8
 LazyData: true
-Imports: stats,
-  RcppRoll
+Imports: 
+    stats,
+    RcppRoll
 RoxygenNote: 6.1.1

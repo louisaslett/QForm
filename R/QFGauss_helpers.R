@@ -3,6 +3,8 @@
 # and extrapolation                      #
 ##########################################
 
+#' @importFrom RcppRoll roll_mean roll_sd
+#' @importFrom stats integrate fft dnorm pgamma pnorm sd splinefun uniroot
 calc.R2<-function(yy,xx,interval.length){
 
   x.bar <- roll_mean(xx, interval.length)
