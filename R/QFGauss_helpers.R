@@ -18,28 +18,26 @@ calc.R2<-function(yy,xx,interval.length){
 }
 
 fft.croppper3<-function(r2,interval.length,num.baseline.intervals){
+  # This function
+
   # this function returns the index of the r2 that is the most reliable extrapolation point minus 1
   # so that the result can be directly added to the index that began r2
 
-  #   win.select<-seq(1,20*interval.length,by=interval.length)
-  #   win.mean<-mean(r2[win.select])
-  #   win.se<-sd(r2[win.select])/sqrt(20)
-  #
-  #   i<-20*interval.length+1
-
-
+  # win.select is the starting index of each window.  It records the start of the most linear segments along the region
+  # We initialize win.select so that the initial windows are half overlapping
   win.select<-seq(1,num.baseline.intervals*floor(interval.length/2),by=floor(interval.length/2))
   win.mean<-mean(r2[win.select])
   win.se<-sd(r2[win.select])/sqrt(num.baseline.intervals)
 
   i<-max(win.select)+1
 
+  # whenever slide the window out into the tail.  If we encounter a segment a segment that is two standard deviations less linear than the average of the segments we've
+  # seen so far, we stop.  If we encounter a segment that is more linear than the current mean, we get rid of the least linear segment indexed by win.select
+  # and add the new segment to the win.select set.
   while(i<=(length(r2)-interval.length)){
-
     if(r2[i] < win.mean-2*win.se){
       break
     }
-
     if(r2[i] > win.mean){
       win.select[which.min(r2[win.select])]<-i
       win.mean<-mean(r2[win.select])
@@ -50,8 +48,10 @@ fft.croppper3<-function(r2,interval.length,num.baseline.intervals){
     }
   }
   # For added robustness, don't take the linear interval that is furthest out, but the one that is second to the furthest out
-  sort(win.select,decreasing = TRUE)[2]-1
+  #browser()
 
+
+  sort(win.select,decreasing = TRUE)[2]-1
 }
 
 extrapolate_tail<-function(log.cdf,xx.standardized,start,best,num.windows,right.side=TRUE){
@@ -60,8 +60,10 @@ extrapolate_tail<-function(log.cdf,xx.standardized,start,best,num.windows,right.
 
   # Choose the interval length so that the windows will be half overlapping
   # And such that the intervals half over lap and extend roughly from 1e-2 to 1e-5
-  interval.length<-ifelse(right.side,floor(2*(which.max(log.cdf>-log(1e-5))-start)/(num.windows+1)),
-                          -floor(2*(which.max(-log.cdf>log(1e-5))-1-start)/(num.windows+1)))
+  # but if the current more reliable extrapolation locus, best, is not as far our as 1e-5, choose the window
+  # size based on that point.
+  interval.length<-ifelse(right.side,floor(2*(min(best,which.max(log.cdf>-log(1e-5)))-start)/(num.windows+3)),
+                          -floor(2*(max(best,which.max(-log.cdf>log(1e-5)))-1-start)/(num.windows+3)))
 
   if(interval.length<10){warning(paste("Too few evaluation points in the",
                                        ifelse(right.side,"right","left"),"tail to make reliable extrapolation: result returned.
@@ -73,13 +75,18 @@ extrapolate_tail<-function(log.cdf,xx.standardized,start,best,num.windows,right.
     return(list("b" = NA,"best" = NA,"successful"=F))
   }
 
+  # RC: IN FUTURE VERSION, CONSIDER USING A.STANDARDIZED AND B.STANDARDIZED AND THE APPROXIMATE MODE OF 0.2, 0.8 QUANTILES OF THE CDF
+  # TO ZOOM IN ON A TAIL AND RUN ANOTHER FFT JUST ON THAT TAIL.  THIS COULD MEAN THAT FOR VERY EXTREME DISTRIBUTIONS WE DO A GENERAL FFT AND THEN ONE IN
+  # EACH TAIL TO GET THE EXTRAPOLATION / SCALE RIGHT, AND THEN STITCH THOSE 3 FFTS TOGETHER...BUT THAT'S MORE WORK THAN NEEDED FOR NOW.
 
+  #browser()
   r2 <- calc.R2(log.cdf[start:best], xx.standardized[start:best], interval.length)
   res <- fft.croppper3(side*r2$corr,interval.length,num.windows)
+  #browser()
+
   best <- start+side*res
   b <- r2$corr[res+1]*r2$y.sd[res+1]/r2$x.sd[res+1]
   #a <- log.cdf[best]-xx.standardized[best]*b
-  #browser()
 
   list("b" = b,"best" = best,"successful"=TRUE)
   }
@@ -328,7 +335,9 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, qfft.apply 
        "b.l" = b.l,
        "limit.r" = limit.r,
        "a.r" = a.r,
-       "b.r" = b.r)
+       "b.r" = b.r,
+       "mu" = mu,
+       "sigma" = sigma)
   }
 
 

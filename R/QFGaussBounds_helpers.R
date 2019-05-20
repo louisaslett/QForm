@@ -130,9 +130,14 @@ WrapConcIneq.identity <- function(c1,c2,nu,L){
     "h1" = function(q,t){
       ifelse(t >= q-c1, 0 , ifelse(t > q-c1-nu*L, (q-c1-t)*exp(-0.5*((q-c1-t)^2)/nu)/nu,L*exp(0.5*nu*L^2-(q-c1)*L+L*t)))
     },
-    "int.h1.const" = function(lower, upper, q){
+    "int.h1.const" = function(lower, upper, q, one.minus = FALSE){
       if(lower>=upper){return(0)}
-      u(q-c1-upper) - u(q-c1-lower)
+      if(one.minus){
+       res <- 1 - u(q-c1-upper) + u(q-c1-lower)
+      }else{
+      res <- u(q-c1-upper) - u(q-c1-lower)
+      }
+      res
     },
     "int.h1.expx" = function(lower, upper, q, a, b){
       if(lower>=upper){return(0)}
@@ -172,9 +177,14 @@ WrapConcIneq.identity <- function(c1,c2,nu,L){
     "h2" = function(q,t){
       ifelse(t <= q-c2, 0 , ifelse(t < q-c2+nu*L, (c2-q+t)*exp(-0.5*((c2-q+t)^2)/nu)/nu,L*exp(0.5*nu*L^2-(c2-q)*L-L*t)))
     },
-    "int.h2.const" = function(lower, upper, q){
+    "int.h2.const" = function(lower, upper, q, one.minus = FALSE){
       if(lower>=upper){return(0)}
-      u(c2-q+lower) - u(c2-q+upper)
+      if(one.minus){
+        res <- 1 - u(c2-q+lower) + u(c2-q+upper)
+      }else{
+        res <- u(c2-q+lower) - u(c2-q+upper)
+      }
+      res
     },
     "int.h2.expx" = function(lower, upper, q, a, b){
       if(lower>=upper){return(0)}
@@ -249,5 +259,15 @@ GaussQuadCDF<-function(from, to, lower.bound = TRUE, cdf,ql,qu,conc.ineqs){
   }
 
   sum(components)
+}
+
+
+QFRestrictInterval <- function(x){
+  x <- ifelse(x < 0, 0, x)
+  ifelse(x > 1, 1, x)
+}
+
+QFSaferSum <- function(x){
+  sum(x[order(abs(x),decreasing = F)])
 }
 

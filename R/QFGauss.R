@@ -8,6 +8,8 @@
 #'
 #' Since \code{stats::fft} can only evaluate the CDF up to double precision, we extrapolate the tails of \eqn{T_f}.  QForm automatically detects the region where the estimated CDF begins to lose precision.  A log-linear function is used for tails that go out to infinity and a log-monomial functions is used for tails truncated at 0 (when all of the \code{f.eta} have the same sign).  These extrapolated tails, motivated by the form of the characteristic function, provide accurate approximations in most cases when compared against a quad-precision implementation (not yet included in \code{QForm}).
 #'
+#' Our current tail extrapolation scheme can struggle in cases where the target distribution is extremely skewed, since that leaves fewer points from the FFT with which to perform extrapolation on one of the tails.  We plan to address this in future versions by deploying a second FFT when needed.
+#'
 #' A note on unbounded densities: The density of \eqn{T_f} if guaranteed to be bounded if length(f.eta) > 2 and there is no trouble in density estimation posed by asymptotes.  In the length(f.eta)==2 case, if the two components of f.eta are of opposite signs, then the density of \eqn{T_f}{T_f} may have an asymptote at some value \eqn{t}{t}.  While the density in the neighborhood around that \eqn{t} should be accurately calculated, due to the FFT and spline interpolation approach used, the density reported at \eqn{t}{t} may be reported as some finite rather than as Inf.  In the length(f.eta)==1 case, QFGauss resorts to dchisq and the density at 0 is accurately reported as Inf.
 #'
 #'
@@ -23,19 +25,15 @@
 #'
 #' cdf <- QFGauss(f.eta, delta)
 #'
-#' 1e3 samples from target distribution
-#' samps <- c(colSums(f.eta * (matrix(rnorm(1e3 * length(f.eta)), nrow = length(f.eta)) + delta)^2))
+#' # Inspect computed CDF
+#' plot(cdf)
 #'
+#' # Plot computed CDF at desired points
 #' x <- seq(-1500, 2000, len = 1e3)
-#' plot(x,ecdf(samps)(x),type="l") # ECDF
-#' lines(x,cdf(x),col="blue") # CDF as calculated by QForm
+#' plot(x,cdf(x),type="l") # ECDF
 #'
-#' plot(x, cdf(x, density = TRUE), type = "l", ylab = "PDF") # plot PDF
-#'
-#' plot(x, -cdf(x, log.p = TRUE)/log(10), type = "l",
-#'  ylab = expression(-log[10](CDF)) ) # plot lower tail of CDF
-#' plot(x, -cdf(x, lower.tail = FALSE, log.p = TRUE)/log(10), type = "l",
-#'  ylab = expression(-log[10](1 - CDF))) # plot upper tail of CDF
+#' # Compare computed CDF to empirical CDF of target distribution based on 10,000 samples
+#' test(cdf)
 #'
 #' @export
 
@@ -51,10 +49,9 @@ QFGauss <- function(f.eta, delta = rep(0,length(f.eta)), n = 2^16-1){
   if(all(f.eta==f.eta[1])){
 
     df <- length(f.eta)
+    C <- abs(f.eta[1])
 
-    return(
-      function(q, density = FALSE, lower.tail = TRUE, log.p = FALSE){
-        C <- abs(f.eta[1])
+      cdf.func <- function(q, density = FALSE, lower.tail = TRUE, log.p = FALSE){
         if(density){
           if(log.p){
             return( dchisq((2*(f.eta[1]>0)-1)*q/C,df,sum(delta^2),TRUE)-log(C) )
@@ -70,11 +67,30 @@ QFGauss <- function(f.eta, delta = rep(0,length(f.eta)), n = 2^16-1){
           }
         }
       }
-    )
+      attr(cdf.func,"fft_used") <- FALSE
+      attr(cdf.func,"f.eta") <- f.eta
+      attr(cdf.func,"delta") <- delta
+      attr(cdf.func,"mu") <- sum(f.eta*(1+delta^2))
+      attr(cdf.func,"sigma") <- sum(2*(1+2*delta^2)*f.eta^2)
+      attr(cdf.func,"tail.features") <- list("lambda.signs" = ifelse(f.eta[1] > 0,"pos","neg"),
+                                             "extrapolation.point.l" = ifelse(f.eta[1] > 0,0,-Inf), #C*qchisq(1e-16,df,sum(delta^2))
+                                             "extrapolation.point.r" = ifelse(f.eta[1] > 0,Inf,0),
+                                             "a.l" = NULL,
+                                             "b.l" = NULL,
+                                             "a.r" = NULL,
+                                             "b.r" = NULL)
+      class(cdf.func) <- c("QFGaussCDF",class(cdf.func))
+    return(cdf.func)
   }
 
   cdf <- calc.QFcdf(evals = f.eta, ncps = delta^2, n = n)
   cdf.func <- wrap.QFcdf(cdf)
+
+  attr(cdf.func,"fft_used") <- TRUE
+  attr(cdf.func,"f.eta") <- f.eta
+  attr(cdf.func,"delta") <- delta
+  attr(cdf.func,"mu") <- cdf$mu
+  attr(cdf.func,"sigma") <- cdf$sigma
   attr(cdf.func,"tail.features") <- list("lambda.signs" = cdf$type,
                                          "extrapolation.point.l" = cdf$x[1],
                                          "extrapolation.point.r" = cdf$x[cdf$n],
@@ -82,9 +98,169 @@ QFGauss <- function(f.eta, delta = rep(0,length(f.eta)), n = 2^16-1){
                                          "b.l" = cdf$b.l,
                                          "a.r" = cdf$a.r,
                                          "b.r" = cdf$b.r)
+
+  class(cdf.func) <- c("QFGaussCDF",class(cdf.func))
   cdf.func
 }
 
+
+#' S3 Method for testing objects in package QForm
+#'
+#' @export
+test <- function(x) UseMethod("test")
+
+
+#' Test function for a QFGaussCDF object
+#'
+#' Compares the CDF inferred by QFGauss to an empicical CDF.
+#'
+#' Four plots are produced.  The top-left plot overlays the CDF computed by QFGauss (in black) and the empirical CDF (in red) based on 10,000 samples.
+#' The top-right plot shows the distance between the empirical and QFGauss-computed CDF and the corresponding ks.test p-value (two-sided alternative).
+#' The two bottom plots compare the empirical CDF (in red) with the computed CDF (in black) in each tail.
+#'
+#' @param cdf a QFGaussCDF
+#' @return There is nothing returned.
+#'
+#' @export
+test.QFGaussCDF <- function(cdf, ...){
+
+  n.samps <- 1e4
+
+  if(class(cdf)[1]!="QFGaussCDF"){stop("cdf must be of class QFGaussCDF")}
+
+  fft_used <- attr(cdf,"fft_used")
+  f.eta <- attr(cdf,"f.eta")
+  delta <- attr(cdf,"delta")
+  mu <- attr(cdf,"mu")
+  sigma <- attr(cdf,"sigma")
+
+  tf <- attr(cdf,"tail.features")
+  lambda.signs <- tf$lambda.signs
+  ep.l <- tf$extrapolation.point.l
+  ep.r <- tf$extrapolation.point.r
+  a.l <- tf$a.l
+  b.l <- tf$b.l
+  a.r <- tf$a.r
+  b.r <- tf$b.r
+
+
+  if(any(is.na(c(a.l,b.l,a.r,b.r)))){stop("test cannot be run because tail extrapolation in QFGauss failed for at least one tail, resulting in NA value for a.l, b.l, a.r, or a.r")}
+
+
+  if(!fft_used){
+    df <- length(f.eta)
+    C <- abs(f.eta[1])
+    ep.l <- C*qchisq(1e-16,length(f.eta),sum(delta^2))
+    ep.r <- C*qchisq(1e-16,length(f.eta),sum(delta^2),lower.tail = FALSE)
+  }
+
+  if(lambda.signs == "mixed"){
+    x.max <-uniroot(function(z) {- cdf(z,lower.tail = F,log.p = T) / log(10) - 20},
+                    lower = ep.r, upper = ep.r + 0.1*sigma,tol = .Machine$double.eps, extendInt = "upX")$root
+    x.min <-uniroot(function(z) {- cdf(z,lower.tail = T,log.p = T) / log(10) - 20},
+                    lower = ep.l - 0.1*sigma, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
+    x <- seq(x.min,x.max,len=1e5)
+  }
+
+  if(lambda.signs == "pos"){
+    x.max <-uniroot(function(z) {- cdf(z,lower.tail = F,log.p = T) / log(10) - 20},
+                    lower = ep.r, upper = ep.r + 0.1*sigma,tol = .Machine$double.eps, extendInt = "upX")$root
+    x <- seq(0,x.max,len=1e5)
+  }
+
+  if(lambda.signs == "neg"){
+    x.min <-uniroot(function(z) {- cdf(z,lower.tail = T,log.p = T) / log(10) - 20},
+                    lower = ep.l - 0.1*sigma, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
+    x <- seq(x.min,0,len=1e3)
+  }
+
+  old.par <- par(no.readonly = T)
+  par(mfrow=c(2,2))
+  samps <- c(colSums(f.eta * (matrix(rnorm(n.samps * length(f.eta)), nrow = length(f.eta)) + delta)^2))
+  qecdf <- ecdf(samps)
+
+  plot(x, cdf(x), type = "l", lwd=1.5, ylab = expression(CDF)) # plot lower tail of CDF
+  lines(x, qecdf(x), lwd=1,col="red") # plot lower tail of CDF
+  #legend("topleft",legend=c("QForm CDF","ECDF"),col=c("black","blue"),lty=c(1,3))
+
+  plot(x,cdf(x)-qecdf(x), type="l",main=paste("ks.test p-value:",ks.test(samps,cdf)$p.value),lwd=1.5)
+  abline(h=0)
+
+  plot(x, -cdf(x, log.p = TRUE)/log(10), type = "l",
+       ylab = expression(-log[10](CDF)) )
+  lines(x,-log10(qecdf(x)),col="red")
+  #legend("topright",legend=c("QForm CDF","ECDF"),col=c("black","blue"),lty=c(1,3))
+
+
+  plot(x, -cdf(x, lower.tail = FALSE, log.p = TRUE)/log(10), type = "l",
+       ylab = expression(-log[10](1 - CDF))) # plot upper tail of CDF
+  lines(x,-log1p(-qecdf(x))/log(10),col="red")
+  #legend("topleft",legend=c("QForm CDF","ECDF"),col=c("black","blue"),lty=c(1,3))
+
+  par(old.par)
+}
+
+
+#' Plotting function for a QFGaussCDF object
+#'
+#' Plots the CDF computed by QFGauss.
+#'
+#' @param cdf a QFGaussCDF
+#' @return There is nothing returned.
+#'
+#' @export
+plot.QFGaussCDF <- function(cdf,n,...){
+  if(class(cdf)[1]!="QFGaussCDF"){stop("cdf must be of class QFGaussCDF")}
+
+  fft_used <- attr(cdf,"fft_used")
+  f.eta <- attr(cdf,"f.eta")
+  delta <- attr(cdf,"delta")
+  mu <- attr(cdf,"mu")
+  sigma <- attr(cdf,"sigma")
+
+  tf <- attr(cdf,"tail.features")
+  lambda.signs <- tf$lambda.signs
+  ep.l <- tf$extrapolation.point.l
+  ep.r <- tf$extrapolation.point.r
+  a.l <- tf$a.l
+  b.l <- tf$b.l
+  a.r <- tf$a.r
+  b.r <- tf$b.r
+
+
+  if(any(is.na(c(a.l,b.l,a.r,b.r)))){stop("test cannot be run because tail extrapolation in QFGauss failed for at least one tail, resulting in NA value for a.l, b.l, a.r, or a.r")}
+
+  if(!fft_used){
+    df <- length(f.eta)
+    C <- abs(f.eta[1])
+    ep.l <- C*qchisq(1e-16,length(f.eta),sum(delta^2))
+    ep.r <- C*qchisq(1e-16,length(f.eta),sum(delta^2),lower.tail = FALSE)
+  }
+
+  if(lambda.signs == "mixed"){
+    x.max <-uniroot(function(z) {- cdf(z,lower.tail = F,log.p = T) / log(10) - 20},
+                    lower = ep.r, upper = ep.r + 0.1*sigma,tol = .Machine$double.eps, extendInt = "upX")$root
+    x.min <-uniroot(function(z) {- cdf(z,lower.tail = T,log.p = T) / log(10) - 20},
+                    lower = ep.l - 0.1*sigma, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
+    x <- seq(x.min,x.max,len=1e5)
+  }
+
+  if(lambda.signs == "pos"){
+    x.max <-uniroot(function(z) {- cdf(z,lower.tail = F,log.p = T) / log(10) - 20},
+                    lower = ep.r, upper = ep.r + 0.1*sigma,tol = .Machine$double.eps, extendInt = "upX")$root
+    x <- seq(0,x.max,len=1e5)
+  }
+
+  if(lambda.signs == "neg"){
+    x.min <-uniroot(function(z) {- cdf(z,lower.tail = T,log.p = T) / log(10) - 20},
+                    lower = ep.l - 0.1*sigma, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
+    x <- seq(x.min,0,len=1e3)
+  }
+
+  old.par <- par(no.readonly = T)
+  plot(x, cdf(x), type = "l", lwd=1.5, ylab = expression(CDF)) # plot lower tail of CDF
+  par(old.par)
+}
 
 
 
