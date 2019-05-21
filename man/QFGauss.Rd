@@ -36,18 +36,14 @@ delta <- c(2, 10, -4, 3, 8, -5, -12)
 
 cdf <- QFGauss(f.eta, delta)
 
-1e3 samples from target distribution
-samps <- c(colSums(f.eta * (matrix(rnorm(1e3 * length(f.eta)), nrow = length(f.eta)) + delta)^2))
+# Inspect computed CDF
+plot(cdf)
 
+# Plot computed CDF at desired points
 x <- seq(-1500, 2000, len = 1e3)
-plot(x,ecdf(samps)(x),type="l") # ECDF
-lines(x,cdf(x),col="blue") # CDF as calculated by QForm
+plot(x,cdf(x),type="l") # ECDF
 
-plot(x, cdf(x, density = TRUE), type = "l", ylab = "PDF") # plot PDF
-
-plot(x, -cdf(x, log.p = TRUE)/log(10), type = "l",
- ylab = expression(-log[10](CDF)) ) # plot lower tail of CDF
-plot(x, -cdf(x, lower.tail = FALSE, log.p = TRUE)/log(10), type = "l",
- ylab = expression(-log[10](1 - CDF))) # plot upper tail of CDF
+# Compare computed CDF to empirical CDF of target distribution based on 10,000 samples
+test(cdf)
 
 }

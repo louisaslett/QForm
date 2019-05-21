@@ -2,9 +2,9 @@
 % Please edit documentation in R/QFGauss.R
 \name{plot.QFGaussCDF}
 \alias{plot.QFGaussCDF}
-\title{Plotting function for a QFGaussCDF object}
+\title{Plot method for a QFGaussCDF object}
 \usage{
-\method{plot}{QFGaussCDF}(cdf, n, ...)
+\method{plot}{QFGaussCDF}(cdf, ...)
 }
 \arguments{
 \item{cdf}{a QFGaussCDF}

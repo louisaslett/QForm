@@ -45,6 +45,10 @@ QFGauss <- function(f.eta, delta = rep(0,length(f.eta)), n = 2^16-1){
 
   if(all(f.eta==0)){stop("All f.eta are zero.")}
 
+  f.eta.order <- order(abs(f.eta),decreasing=T)
+  f.eta <- f.eta[f.eta.order]
+  delta <- delta[f.eta.order]
+
 
   if(all(f.eta==f.eta[1])){
 
@@ -104,10 +108,67 @@ QFGauss <- function(f.eta, delta = rep(0,length(f.eta)), n = 2^16-1){
 }
 
 
-#' S3 Method for testing objects in package QForm
+
+#' Plot method for a QFGaussCDF object
+#'
+#' Plots the CDF computed by QFGauss.
+#'
+#' @param cdf a QFGaussCDF
+#' @return There is nothing returned.
 #'
 #' @export
-test <- function(x) UseMethod("test")
+plot.QFGaussCDF <- function(cdf,...){
+  if(class(cdf)[1]!="QFGaussCDF"){stop("cdf must be of class QFGaussCDF")}
+
+  fft_used <- attr(cdf,"fft_used")
+  f.eta <- attr(cdf,"f.eta")
+  delta <- attr(cdf,"delta")
+  mu <- attr(cdf,"mu")
+  sigma <- attr(cdf,"sigma")
+
+  tf <- attr(cdf,"tail.features")
+  lambda.signs <- tf$lambda.signs
+  ep.l <- tf$extrapolation.point.l
+  ep.r <- tf$extrapolation.point.r
+  a.l <- tf$a.l
+  b.l <- tf$b.l
+  a.r <- tf$a.r
+  b.r <- tf$b.r
+
+
+  if(any(is.na(c(a.l,b.l,a.r,b.r)))){stop("test cannot be run because tail extrapolation in QFGauss failed for at least one tail, resulting in NA value for a.l, b.l, a.r, or a.r")}
+
+  if(!fft_used){
+    df <- length(f.eta)
+    C <- abs(f.eta[1])
+    ep.l <- C*qchisq(1e-16,length(f.eta),sum(delta^2))
+    ep.r <- C*qchisq(1e-16,length(f.eta),sum(delta^2),lower.tail = FALSE)
+  }
+
+  if(lambda.signs == "mixed"){
+    x.max <-uniroot(function(z) {- cdf(z,lower.tail = F,log.p = T) / log(10) - 20},
+                    lower = ep.r, upper = ep.r + 0.1*sigma,tol = .Machine$double.eps, extendInt = "upX")$root
+    x.min <-uniroot(function(z) {- cdf(z,lower.tail = T,log.p = T) / log(10) - 20},
+                    lower = ep.l - 0.1*sigma, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
+    x <- seq(x.min,x.max,len=1e5)
+  }
+
+  if(lambda.signs == "pos"){
+    x.max <-uniroot(function(z) {- cdf(z,lower.tail = F,log.p = T) / log(10) - 20},
+                    lower = ep.r, upper = ep.r + 0.1*sigma,tol = .Machine$double.eps, extendInt = "upX")$root
+    x <- seq(0,x.max,len=1e5)
+  }
+
+  if(lambda.signs == "neg"){
+    x.min <-uniroot(function(z) {- cdf(z,lower.tail = T,log.p = T) / log(10) - 20},
+                    lower = ep.l - 0.1*sigma, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
+    x <- seq(x.min,0,len=1e3)
+  }
+
+  old.par <- par(no.readonly = T)
+  plot(x, cdf(x), type = "l", lwd=1.5, ylab = expression(CDF)) # plot lower tail of CDF
+  par(old.par)
+}
 
 
 #' Test function for a QFGaussCDF object
@@ -119,12 +180,11 @@ test <- function(x) UseMethod("test")
 #' The two bottom plots compare the empirical CDF (in red) with the computed CDF (in black) in each tail.
 #'
 #' @param cdf a QFGaussCDF
+#' @param n.samps number of draws from the target distribution with which to construct the empirical CDF
 #' @return There is nothing returned.
 #'
 #' @export
-test.QFGaussCDF <- function(cdf, ...){
-
-  n.samps <- 1e4
+TestQFGauss <- function(cdf, n.samps = 1e4){
 
   if(class(cdf)[1]!="QFGaussCDF"){stop("cdf must be of class QFGaussCDF")}
 
@@ -171,7 +231,7 @@ test.QFGaussCDF <- function(cdf, ...){
   if(lambda.signs == "neg"){
     x.min <-uniroot(function(z) {- cdf(z,lower.tail = T,log.p = T) / log(10) - 20},
                     lower = ep.l - 0.1*sigma, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
-    x <- seq(x.min,0,len=1e3)
+    x <- seq(x.min,0,len=1e5)
   }
 
   old.par <- par(no.readonly = T)
@@ -201,66 +261,7 @@ test.QFGaussCDF <- function(cdf, ...){
 }
 
 
-#' Plotting function for a QFGaussCDF object
-#'
-#' Plots the CDF computed by QFGauss.
-#'
-#' @param cdf a QFGaussCDF
-#' @return There is nothing returned.
-#'
-#' @export
-plot.QFGaussCDF <- function(cdf,n,...){
-  if(class(cdf)[1]!="QFGaussCDF"){stop("cdf must be of class QFGaussCDF")}
 
-  fft_used <- attr(cdf,"fft_used")
-  f.eta <- attr(cdf,"f.eta")
-  delta <- attr(cdf,"delta")
-  mu <- attr(cdf,"mu")
-  sigma <- attr(cdf,"sigma")
-
-  tf <- attr(cdf,"tail.features")
-  lambda.signs <- tf$lambda.signs
-  ep.l <- tf$extrapolation.point.l
-  ep.r <- tf$extrapolation.point.r
-  a.l <- tf$a.l
-  b.l <- tf$b.l
-  a.r <- tf$a.r
-  b.r <- tf$b.r
-
-
-  if(any(is.na(c(a.l,b.l,a.r,b.r)))){stop("test cannot be run because tail extrapolation in QFGauss failed for at least one tail, resulting in NA value for a.l, b.l, a.r, or a.r")}
-
-  if(!fft_used){
-    df <- length(f.eta)
-    C <- abs(f.eta[1])
-    ep.l <- C*qchisq(1e-16,length(f.eta),sum(delta^2))
-    ep.r <- C*qchisq(1e-16,length(f.eta),sum(delta^2),lower.tail = FALSE)
-  }
-
-  if(lambda.signs == "mixed"){
-    x.max <-uniroot(function(z) {- cdf(z,lower.tail = F,log.p = T) / log(10) - 20},
-                    lower = ep.r, upper = ep.r + 0.1*sigma,tol = .Machine$double.eps, extendInt = "upX")$root
-    x.min <-uniroot(function(z) {- cdf(z,lower.tail = T,log.p = T) / log(10) - 20},
-                    lower = ep.l - 0.1*sigma, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
-    x <- seq(x.min,x.max,len=1e5)
-  }
-
-  if(lambda.signs == "pos"){
-    x.max <-uniroot(function(z) {- cdf(z,lower.tail = F,log.p = T) / log(10) - 20},
-                    lower = ep.r, upper = ep.r + 0.1*sigma,tol = .Machine$double.eps, extendInt = "upX")$root
-    x <- seq(0,x.max,len=1e5)
-  }
-
-  if(lambda.signs == "neg"){
-    x.min <-uniroot(function(z) {- cdf(z,lower.tail = T,log.p = T) / log(10) - 20},
-                    lower = ep.l - 0.1*sigma, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
-    x <- seq(x.min,0,len=1e3)
-  }
-
-  old.par <- par(no.readonly = T)
-  plot(x, cdf(x), type = "l", lwd=1.5, ylab = expression(CDF)) # plot lower tail of CDF
-  par(old.par)
-}
 
 
 

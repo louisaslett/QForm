@@ -365,19 +365,19 @@ eval.cdf.pos <- function(q, cdf, density = FALSE, lower.tail = TRUE, log.p = FAL
 
     if(lower.tail & !log.p){
       return(ifelse(q < 0, 0, ifelse(q<cdf$x[1] & (!is.null(cdf$b.l)),suppressWarnings( exp(-(cdf$a.l + cdf$b.l*log(q))) ),
-                                     ifelse(q>cdf$x[cdf$n],-expm1(-(cdf$a.r + cdf$b.r*q)),
+                                     ifelse(q>cdf$x[cdf$n],suppressWarnings( -expm1(-(cdf$a.r + cdf$b.r*q)) ),
                                             splinefun(cdf$x,cdf$y,method="mono")(q)))))
     }
 
     if(!lower.tail & !log.p){
       return(ifelse(q < 0, 1, ifelse(q<cdf$x[1] & (!is.null(cdf$b.l)),suppressWarnings( -expm1(-(cdf$a.l + cdf$b.l*log(q))) ),
-                                     ifelse(q>cdf$x[cdf$n],exp(-(cdf$a.r + cdf$b.r*q)),
+                                     ifelse(q>cdf$x[cdf$n],suppressWarnings( exp(-(cdf$a.r + cdf$b.r*q)) ),
                                             1-splinefun(cdf$x,cdf$y,method="mono")(q)))))
     }
 
     if(lower.tail & log.p){
       return(ifelse(q < 0, -Inf, ifelse(q<cdf$x[1] & (!is.null(cdf$b.l)),suppressWarnings( -(cdf$a.l + cdf$b.l*log(q)) ),
-                                        ifelse(q>cdf$x[cdf$n],log(-expm1(-(cdf$a.r + cdf$b.r*q))),
+                                        ifelse(q>cdf$x[cdf$n],suppressWarnings( log(-expm1(-(cdf$a.r + cdf$b.r*q))) ),
                                                suppressWarnings(log(splinefun(cdf$x,cdf$y,method="mono")(q)))))))
     }
     if(!lower.tail & log.p){
@@ -452,12 +452,12 @@ eval.cdf.mixed <- function(q, cdf, density = FALSE, lower.tail = TRUE, log.p = F
 
     if(lower.tail & !log.p){
       return(ifelse(q<cdf$x[1],exp(-(cdf$a.l + cdf$b.l*q)),
-                    ifelse(q>cdf$x[cdf$n],-expm1(-(cdf$a.r + cdf$b.r*q)),
+                    ifelse(q>cdf$x[cdf$n],suppressWarnings(-expm1(-(cdf$a.r + cdf$b.r*q))),
                            splinefun(cdf$x,cdf$y,method="mono")(q))))
     }
 
     if(!lower.tail & !log.p){
-      return(ifelse(q<cdf$x[1],-expm1(-(cdf$a.l + cdf$b.l*q)),
+      return(ifelse(q<cdf$x[1],suppressWarnings(-expm1(-(cdf$a.l + cdf$b.l*q))),
                     ifelse(q>cdf$x[cdf$n],exp(-(cdf$a.r + cdf$b.r*q)),
                            1-splinefun(cdf$x,cdf$y,method="mono")(q))))
     }
