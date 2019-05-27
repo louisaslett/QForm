@@ -5,6 +5,7 @@
 
 #' @importFrom RcppRoll roll_mean roll_sd
 #' @importFrom stats integrate fft dnorm pgamma pnorm sd splinefun uniroot
+#'
 calc.R2<-function(yy,xx,interval.length){
 
   x.bar <- roll_mean(xx, interval.length)
@@ -96,7 +97,7 @@ log.rho.Q.easy.centered<-function(t,evals.s,ncps,a,mu.s){
                                         - 0.5*log(complex(real=1,imaginary=-2*t*evals.s))  )
 }
 
-calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, qfft.apply = sapply) {
+calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, parallel.sapply = sapply) {
   # This function estimates the CDF of the truncated distribution with the identity function
   # as the function of interest
 
@@ -112,6 +113,8 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, qfft.apply 
   if(length(evals)!=length(ncps)){stop("length of evals does not equal length of ncps")}
 
   if(any(ncps<0)){stop("ncps must be non-negative.")}
+
+  if(any(is.infinite(evals)) | any(is.infinite(ncps))){stop("All evals and ncps must be finite.")}
 
   if(all(evals==0)){stop("All evals are 0.")}
   if(any(evals==0)){
@@ -130,6 +133,7 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, qfft.apply 
   mu <- sum((ncps+1)*evals)
   v <- 2*(1+2*ncps)*(evals^2)
   sigma <- sqrt(sum(v))
+  if(is.infinite(sigma)){stop("The variance of the target distribution is too large to be numerically represented on this machine.  Please consider rescaling the target and try again.")}
   s <- sqrt(max(v))
 
   evals.s <- evals / s
@@ -155,7 +159,7 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, qfft.apply 
     ifelse(z <= nu / (4*resid.op.norm.bd),
            0.5*(z^2) / nu,
            z / (4*resid.op.norm.bd) - 0.5*nu / ((4*resid.op.norm.bd)^2) ) / log(10) - bound
-  }, lower = 0, upper = 1e3*sigma/s,tol = .Machine$double.eps,
+  }, lower = 0, upper = 1e3*(sigma/s),tol = .Machine$double.eps,
   nu = 8*sum(ncps*(evals.s^2))+4*sum(evals.s^2), resid.op.norm.bd = max(evals.s), bound = 17,
   extendInt = "upX")$root
 
@@ -167,7 +171,7 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, qfft.apply 
       ifelse(z <= nu / (4*resid.op.norm.bd),
              0.5*(z^2) / nu,
              z / (4*resid.op.norm.bd) - 0.5*nu / ((4*resid.op.norm.bd)^2) ) / log(10) - bound
-    }, lower = 0, upper = 1e3*sigma/s,tol = .Machine$double.eps,
+    }, lower = 0, upper = 1e3*(sigma/s),tol = .Machine$double.eps,
     nu = 8*sum(ncps*(evals.s^2))+4*sum(evals.s^2), resid.op.norm.bd = abs(min(evals.s)), bound = 17,
     extendInt = "upX")$root
   }
@@ -175,7 +179,7 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, qfft.apply 
   # Evaluate CDF using FFT
   ######################
 
-  rho <- sapply(1:n, function(k, a.standardized, b.standardized, n, evals.s, ncps,mu.s) {
+  rho <- parallel.sapply(1:n, function(k, a.standardized, b.standardized, n, evals.s, ncps,mu.s) {
     exp(log.rho.Q.easy.centered((pi*n/(b.standardized-a.standardized))*(2*((k-1)/n)-1),
                                 evals.s,ncps, a.standardized,mu.s)) / (pi*(2*((k-1)/n)-1))
   }, a.standardized = a.standardized, b.standardized = b.standardized, n = n, evals.s = evals.s, ncps = ncps, mu.s = mu.s)
@@ -414,7 +418,7 @@ eval.cdf.neg <- function(q, cdf, density = FALSE, lower.tail = TRUE, log.p = FAL
     }
 
     if(!lower.tail & !log.p){
-      return(ifelse(q > 0, 0, ifelse(q < cdf$x[1],-expm1(-(cdf$a.l + cdf$b.l*q)),
+      return(ifelse(q > 0, 0, ifelse(q < cdf$x[1],suppressWarnings(-expm1(-(cdf$a.l + cdf$b.l*q))),
                                      ifelse(q > cdf$x[cdf$n] & (!is.null(cdf$b.r)),suppressWarnings( exp(-(cdf$a.r + cdf$b.r*log(-q))) ),
                                             1-splinefun(cdf$x,cdf$y,method="mono")(q)))))
     }
@@ -425,7 +429,7 @@ eval.cdf.neg <- function(q, cdf, density = FALSE, lower.tail = TRUE, log.p = FAL
                                             suppressWarnings(log(splinefun(cdf$x,cdf$y,method="mono")(q)))))))
     }
     if(!lower.tail & log.p){
-      return(ifelse(q > 0, -Inf, ifelse(q < cdf$x[1],log(-expm1(-(cdf$a.l + cdf$b.l*q))),
+      return(ifelse(q > 0, -Inf, ifelse(q < cdf$x[1],suppressWarnings(log(-expm1(-(cdf$a.l + cdf$b.l*q)))),
                                         ifelse(q > cdf$x[cdf$n] & (!is.null(cdf$b.r)),suppressWarnings( -(cdf$a.r + cdf$b.r*log(-q))),
                                                suppressWarnings(log1p(-splinefun(cdf$x,cdf$y,method="mono")(q)))))))
     }

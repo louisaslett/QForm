@@ -1,12 +1,11 @@
 #' Bounds on the CDF of a Quadratic Form in Gaussians
 #'
-#' Returns upper and lower bounds on the CDF for random variables \eqn{Q_f = T_f + R_f} where \deqn{T_f = \sum\limits_{i \in \mathcal{T}} f\left(\eta_i \right) \left(Z_i + \delta_i)^2, \ \ \ \ R_f = \sum\limits_{i \in \mathcal{R}} f\left(\eta_i \right) \left(Z_i + \delta_i)^2}{T_f = \Sigma_{i \in T} f (\eta_i) (Z_i + \delta_i)^2,     R_f = \Sigma_{i \in R} f (\eta_i) (Z_i + \delta_i)^2,} \eqn{Z_i \sim N(0,1)}{Z_i ~ N(0,1)}, and only the CDF of \eqn{T_f} is known.
+#' Returns a function for calculating upper and lower bounds on the CDF for random variables \eqn{Q_f = T_f + R_f} where \deqn{T_f = \sum\limits_{i \in \mathcal{T}} f\left(\eta_i \right) \left(Z_i + \delta_i)^2, \ \ \ \ R_f = \sum\limits_{i \in \mathcal{R}} f\left(\eta_i \right) \left(Z_i + \delta_i)^2}{T_f = \Sigma_{i \in T} f (\eta_i) (Z_i + \delta_i)^2,     R_f = \Sigma_{i \in R} f (\eta_i) (Z_i + \delta_i)^2,} \eqn{Z_i \sim N(0,1)}{Z_i ~ N(0,1)}, and only the CDF of \eqn{T_f} is known.
 #'
 #' Currently only \eqn{f = "identity"} is supported, but future versions will allow one to select \eqn{f} from a list or specify their own function with it's corresponding bounds through a QFormFunction object.
 #'
-#' For a given input \code{q}, the returned function outputs a vector with the lower bound on the CDF at \code{q} as the first entry; the upper bound, as the second.  If \code{q} is not known exactly, but only a lower bound \code{ql} and an upper bound \code{qu} are known, then those may provided instead of \code{q} and the returned bounds on the CDF will be valid for an \code{q} in \code{[ql,qu]}.  If \code{q} is provided, \code{ql} and \code{qu} are ignored.
-#'
-#' The returned function has two optional, logical arguments.  \code{lower.tail} returns 1 minus the bounds when \code{TRUE} (not used if \code{density}==TRUE) and is highly recommended for those interested in the upper tail of \eqn{Q_f}.  \code{log.p} returns the desired bounds in log space.
+#' The returned bounds function takes as arguments either a single vector of observed values \code{q} at which to calculate bounds. If \code{q} is not known exactly, but only a lower bound \code{ql} and an upper bound \code{qu} are known, then those may provided instead of \code{q} and the returned bounds on the CDF will be valid for an \code{q} in \code{[ql,qu]}.  If \code{q} is provided, \code{ql} and \code{qu} are ignored.
+#' The bounds function itself returns a dataframe with four columns: \code{c("lower.bound","upper.bound","one.minus.lower.bound","one.minus.upper.bound")}.  The first and second columns are lower and upper bounds on the CDF at \code{q} respectively; the third and fourth columns are equal to one minus the first two columns but calculated separately by the function internally in order to maintain numerical precision in the upper tail.  Thus, it is strongly recommneded that users interested in upper tail p-values use the third and fourth columns rather than the first and second.
 #'
 #' @param cdf function; the cdf of \eqn{T_f} returned by \code{QForm::QForm}
 #' @param f character or QFormFunction object; the function \eqn{f} for the \eqn{Q_f} of interest.
@@ -15,8 +14,8 @@
 #' @param sum.etasq vector; element-wise sum of the \eqn{\eta^2_i} in \eqn{R_f} (see Details)
 #' @param sum.eta.deltasq vector; element-wise sum of the \eqn{\eta_i \delta^2_i} in \eqn{R_f} (see Details)
 #' @param sum.etasq.deltasq vector; element-wise sum of the \eqn{\eta^2_i \delta^2_i} in \eqn{R_f} (see Details)
-#'
-#' @return A non-vectorized function which evaluates upper and lower bounds on the CDF of \eqn{Q_f}.
+#' @seealso \code{\link{QFGauss}}, \code{\link{TestQFGaussBounds}}
+#' @return A vectorized function which evaluates upper and lower bounds on the CDF of \eqn{Q_f}.
 #'
 #' @examples
 #'
@@ -39,7 +38,7 @@
 #' points(xx, y$upper, col = "red")
 #'
 #' @export
-QFGaussBounds <- function(cdf, f = "identity", max.abs.eta, sum.eta, sum.etasq, sum.eta.deltasq = 0, sum.etasq.deltasq = 0) {
+QFGaussBounds <- function(cdf, f = "identity", max.abs.eta, sum.eta, sum.etasq, sum.eta.deltasq = 0, sum.etasq.deltasq = 0){
 
   if(max.abs.eta <= 0){stop("max.eta must be positive")}
 
@@ -66,27 +65,17 @@ QFGaussBounds <- function(cdf, f = "identity", max.abs.eta, sum.eta, sum.etasq, 
   b.r <- tf$b.r
 
   # Create bounding function
-  bound.func <- function(q = NULL, ql = NULL, qu = NULL){
-
-    # if q is specified it overrides q.l and q.u
-    if(any(length(q),length(ql),length(qu))>1){stop("q, q.l, and q.u cannot have length > 1")}
-
-    # If q is specified, it over-rides qu and ql.
-    if(!is.null(q)){
-      if(!is.numeric(q)){stop("q must be numeric")}
-      qu <- ql <- q
-    }else{
-      if( !(is.numeric(ql) & is.numeric(qu))  ){stop("ql and qu must be numeric")}
-    }
+  bound.func <- function(X){
+    ql <- X[1]
+    qu <- X[2]
 
     # Initialize
     upper.components <- lower.components <- rep(0,5)
+    # The first component here is a relic from a previous version.  That element will be removed in a later version.
 
     upper.components.4.alt <- lower.components.4.alt <- 1
 
     ### Compute Upper Bound
-
-    upper.components[1] <- (1-conc.ineqs$l(0))*cdf(qu-conc.ineqs$c2)
 
     if(qu-conc.ineqs$c2 < ep.l){
 
@@ -160,8 +149,6 @@ QFGaussBounds <- function(cdf, f = "identity", max.abs.eta, sum.eta, sum.etasq, 
 
     ### Compute Lower Bound
 
-    lower.components[1] <- (1-conc.ineqs$u(0))*cdf(ql-conc.ineqs$c1)
-
     if(ql-conc.ineqs$c1 > ep.r){
 
       if(lambda.signs=="mixed"){
@@ -219,7 +206,7 @@ QFGaussBounds <- function(cdf, f = "identity", max.abs.eta, sum.eta, sum.etasq, 
     }
 
 
-
+ #browser()
     # Sum across components
 
     one.minus.upper.components <- - upper.components
@@ -242,31 +229,26 @@ QFGaussBounds <- function(cdf, f = "identity", max.abs.eta, sum.eta, sum.etasq, 
     names(ans) <- c("lower.bound","upper.bound","one.minus.lower.bound","one.minus.upper.bound")
     ans
   }
-  class(bound.func) <- c("QFGaussBoundsFunc",class(bound.func))
-
-  bound.func
-}
 
 
-RawQFGaussBounds <- function(cdf, f= "identity", max.abs.eta, sum.eta, sum.etasq, sum.eta.deltasq = 0, sum.etasq.deltasq = 0){
-
-  nu <- 8*sum.etasq.deltasq + 4*sum.etasq
-  L <- 1/(4*max.abs.eta)
-  Er <- sum.eta.deltasq + sum.eta
-
-  u <- function(y) ifelse(y <= 0, 1, ifelse(y < nu*L,exp(-0.5*(y^2)/nu),exp(0.5*nu*L^2-y*L) ))
-  lower.integrand <- function(t,q){cdf(t,density = T)*u(q - Er- t)}
-  upper.integrand <- function(t,q){cdf(t,density = T)*u(-(q - Er- t))}
-
-  # Return function that takes in observed values
-  function(obs){
-    lower <- max(0,cdf(obs-Er) - integrate(lower.integrand,lower = -Inf,upper=obs-Er,rel.tol = 1e-20,stop.on.error = FALSE,q = obs)$value)
-    upper <- min(1,cdf(obs-Er) + integrate(upper.integrand,lower = obs-Er,upper=Inf,rel.tol = 1e-20,stop.on.error = FALSE, q = obs)$value)
-    ans <- c(lower,upper,1-lower,1-upper)
-    names(ans) <- c("lower.bound","upper.bound","one.minus.lower.bound","one.minus.upper.bound")
-    ans
+  wrapped.bound.func <- function(q = NULL, ql = NULL, qu = NULL, parallel.sapply = base::sapply){
+    # If q is specified, it over-rides qu and ql.
+    if(!is.null(q)){
+      if(!is.numeric(q)){stop("q must be numeric")}
+      return(as.data.frame(t(parallel.sapply(split(cbind(q,q),1:length(q)),bound.func))))
+    }else{
+      if( !(is.numeric(ql) & is.numeric(qu))  ){stop("ql and qu must be numeric")}
+      if(length(ql)!=length(qu)){stop("ql and qu must have the same length")}
+      if(any(qu<ql)){stop("ql must be less than or equal to qu")}
+      return(as.data.frame(t(parallel.sapply(split(cbind(ql,qu),1:length(ql)),bound.func))))
+    }
   }
+
+  class(wrapped.bound.func) <- c("QFGaussBoundsFunc",class(wrapped.bound.func))
+  wrapped.bound.func
+
 }
+
 
 #' Test function for a QFGaussBounds
 #'
@@ -279,13 +261,17 @@ RawQFGaussBounds <- function(cdf, f= "identity", max.abs.eta, sum.eta, sum.etasq
 #' the true -log_10 p-value and the approximate -log_10 p-value.  The difference in p-values in the upper tail is plotted with a solid line.  The difference in p-values in the lower tail is plotted with a dashed line.  This plot effectively shows how far one might be misled by the truncated approximation shifted by the expectation of the remainder terms.
 #' The two bottom plots show the top-left plot, just on the log-scale, to focus on each tail separately.
 #'
-#' @param fullcdf a QFGaussCDF of the target distribution including all terms
-#' @param k the number of truncated terms provided to QFGaussBounds from which to bound fullcdf
-#' @param n.bound.points the number of points at which to evaluate the bounds for plotting
+#' @param fullcdf QFGaussCDF; the target CDF including all terms
+#' @param k numeric; the number of truncated terms provided to QFGaussBounds from which to bound fullcdf
+#' @param n.bound.points numeric; the number of points at which to evaluate the bounds for plotting
+#' @param lower.tail.end numeric; the -log_10 lower tail probability at which to start each x-axis (default = 20)
+#' @param upper.tail.end numeric; the -log_10 upper tail probability at which to end each x-axis (default = 20 )
+#' @param parallel.sapply function; a user-provided version of \code{sapply}, see Details.
 #' @return There is nothing returned.
-#'
+#' @seealso \code{\link{QFGaussBounds}}, \code{\link{TestQFGauss}}
 #' @export
-TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.eta"))/2)), n.bound.points = 20){
+TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.eta"))/2)), n.bound.points = 20,
+                              lower.tail.end = 20, upper.tail.end = 20, parallel.sapply = base::sapply){
 
   message("Comparing the provided fullcdf to a truncated approximation base on the first k = ",k," terms.  This may take a minute.")
   if(class(fullcdf)[1]!="QFGaussCDF"){stop("fullcdf must be of class QFGaussCDF")}
@@ -309,20 +295,20 @@ TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.e
 
 
   if(lambda.signs == "mixed"){
-    x.max <-uniroot(function(z) {- fullcdf(z,lower.tail = F,log.p = T) / log(10) - 20},
+    x.max <-uniroot(function(z) {- fullcdf(z,lower.tail = F,log.p = T) / log(10) - upper.tail.end},
                     lower = ep.r, upper = ep.r + 0.1*sigma,tol = .Machine$double.eps, extendInt = "upX")$root
-    x.min <-uniroot(function(z) {- fullcdf(z,lower.tail = T,log.p = T) / log(10) - 20},
+    x.min <-uniroot(function(z) {- fullcdf(z,lower.tail = T,log.p = T) / log(10) - lower.tail.end},
                     lower = ep.l - 0.1*sigma, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
   }
 
   if(lambda.signs == "pos"){
     x.min <- 0
-    x.max <-uniroot(function(z) {- fullcdf(z,lower.tail = F,log.p = T) / log(10) - 20},
+    x.max <-uniroot(function(z) {- fullcdf(z,lower.tail = F,log.p = T) / log(10) - upper.tail.end},
                     lower = ep.r, upper = ep.r + 0.1*sigma,tol = .Machine$double.eps, extendInt = "upX")$root
   }
 
   if(lambda.signs == "neg"){
-    x.min <-uniroot(function(z) {- fullcdf(z,lower.tail = T,log.p = T) / log(10) - 20},
+    x.min <-uniroot(function(z) {- fullcdf(z,lower.tail = T,log.p = T) / log(10) - lower.tail.end},
                     lower = ep.l - 0.1*sigma, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
     x.max <- 0
   }
@@ -334,7 +320,7 @@ TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.e
   par(mfrow=c(2,2))
 
 
-  tcdf <- QFGauss(f.eta[1:k],delta[1:k])
+  tcdf <- QFGauss(f.eta[1:k],delta[1:k],parallel.sapply = parallel.sapply)
 
   max.abs.eta <- abs(f.eta[k])
   sum.eta <- sum(f.eta[(k+1):length(f.eta)])
@@ -358,8 +344,8 @@ TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.e
                                      sum.eta.deltasq,
                                      sum.etasq.deltasq)
 
-  bounds <-t(sapply(xx,bound.func))
-  raw.bounds<-t(sapply(xx,raw.bound.func))
+  bounds <- bound.func(xx,parallel.sapply = parallel.sapply)
+  raw.bounds <- raw.bound.func(xx,parallel.sapply = parallel.sapply)
 
 
   Er <- sum.eta.deltasq + sum.eta
@@ -378,15 +364,15 @@ TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.e
   lines(x,approxfullcdf(x),type="l",col="darkorange",lwd=1.5)
 
 
-  true.pval.uppertail <- fullcdf(uniroot(function(z) {- approxfullcdf(z,lower.tail = F,log.p = T) / log(10) - 8},
+  true.pval.uppertail <- fullcdf(suppressWarnings(uniroot(function(z) {- approxfullcdf(z,lower.tail = F,log.p = T) / log(10) - 8},
                                          lower = attr(approxfullcdf,"mu")-2*attr(approxfullcdf,"sigma"),
                                          upper = attr(approxfullcdf,"mu") + 0.1*attr(approxfullcdf,"sigma"),
-                                         tol = .Machine$double.eps, extendInt = "upX")$root,lower.tail = F)
+                                         tol = .Machine$double.eps, extendInt = "upX")$root),lower.tail = F)
 
-  true.pval.lowertail <- fullcdf(uniroot(function(z) {- approxfullcdf(z,log.p = T) / log(10) - 8},
+  true.pval.lowertail <- fullcdf(suppressWarnings(uniroot(function(z) {- approxfullcdf(z,log.p = T) / log(10) - 8},
                                          lower = attr(approxfullcdf,"mu")-0.1*attr(approxfullcdf,"sigma"),
                                          upper = attr(approxfullcdf,"mu") + 2*attr(approxfullcdf,"sigma"),
-                                         tol = .Machine$double.eps, extendInt = "downX")$root)
+                                         tol = .Machine$double.eps, extendInt = "downX")$root))
 
   yy.uppertail <- -fullcdf(x,lower.tail = F, log.p = T)/log(10) + approxfullcdf(x,lower.tail = F, log.p = T)/log(10)
   yy.lowertail <- -fullcdf(x, log.p = T)/log(10) + approxfullcdf(x, log.p = T)/log(10)
@@ -424,7 +410,5 @@ TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.e
   points(xx,-log10(raw.bounds[,3]),col="blue",pch=4)
   points(xx,-log10(raw.bounds[,4]),col="red",pch=4)
   lines(x,-approxfullcdf(x,lower.tail = F,log.p = T)/log(10),type="l",col="darkorange",lwd=1.5)
-
 }
-
 

@@ -1,9 +1,9 @@
 Package: QForm
 Type: Package
 Title: Methods for Bounding P-values and Scalable Screening with Quadratic Forms
-Version: 0.1.0
-Authors@R: c(person("Louis J. M.", "Aslett", email = "louis@louisaslett.com", role = c("aut","cre")), person("Ryan", "Christ", email = "rchrist@wustl.edu", role = c("aut")))
-Maintainer: Louis J. M. Aslett <louis@louisaslett.com>
+Version: 0.2.0
+Authors@R: c(person("Ryan R.", "Christ", email = "rchrist@wustl.edu", role = c("aut","cre")), person("Louis J. M.", "Aslett", email = "louis@louisaslett.com", role = c("aut")))
+Maintainer: Ryan R. Christ <rchrist@wustl.edu>
 Description: QForm provides upper and lower bounds on p-values for test statistics of the form \dqen{\sum\limits_i f\left(\lambda_i\right) \left(Z_i + \delta_i)^2}{\Sigma f( \lambda_i ) (Z_i + \delta_i)^2}.
 License: GPL-3
 Encoding: UTF-8
@@ -11,4 +11,7 @@ LazyData: true
 Imports: 
     stats,
     RcppRoll
+Suggests:
+    future,
+    future.apply
 RoxygenNote: 6.1.1

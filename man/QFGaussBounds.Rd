@@ -23,17 +23,16 @@ QFGaussBounds(cdf, f = "identity", max.abs.eta, sum.eta, sum.etasq,
 \item{sum.etasq.deltasq}{vector; element-wise sum of the \eqn{\eta^2_i \delta^2_i} in \eqn{R_f} (see Details)}
 }
 \value{
-A non-vectorized function which evaluates upper and lower bounds on the CDF of \eqn{Q_f}.
+A vectorized function which evaluates upper and lower bounds on the CDF of \eqn{Q_f}.
 }
 \description{
-Returns upper and lower bounds on the CDF for random variables \eqn{Q_f = T_f + R_f} where \deqn{T_f = \sum\limits_{i \in \mathcal{T}} f\left(\eta_i \right) \left(Z_i + \delta_i)^2, \ \ \ \ R_f = \sum\limits_{i \in \mathcal{R}} f\left(\eta_i \right) \left(Z_i + \delta_i)^2}{T_f = \Sigma_{i \in T} f (\eta_i) (Z_i + \delta_i)^2,     R_f = \Sigma_{i \in R} f (\eta_i) (Z_i + \delta_i)^2,} \eqn{Z_i \sim N(0,1)}{Z_i ~ N(0,1)}, and only the CDF of \eqn{T_f} is known.
+Returns a function for calculating upper and lower bounds on the CDF for random variables \eqn{Q_f = T_f + R_f} where \deqn{T_f = \sum\limits_{i \in \mathcal{T}} f\left(\eta_i \right) \left(Z_i + \delta_i)^2, \ \ \ \ R_f = \sum\limits_{i \in \mathcal{R}} f\left(\eta_i \right) \left(Z_i + \delta_i)^2}{T_f = \Sigma_{i \in T} f (\eta_i) (Z_i + \delta_i)^2,     R_f = \Sigma_{i \in R} f (\eta_i) (Z_i + \delta_i)^2,} \eqn{Z_i \sim N(0,1)}{Z_i ~ N(0,1)}, and only the CDF of \eqn{T_f} is known.
 }
 \details{
 Currently only \eqn{f = "identity"} is supported, but future versions will allow one to select \eqn{f} from a list or specify their own function with it's corresponding bounds through a QFormFunction object.
 
-For a given input \code{q}, the returned function outputs a vector with the lower bound on the CDF at \code{q} as the first entry; the upper bound, as the second.  If \code{q} is not known exactly, but only a lower bound \code{ql} and an upper bound \code{qu} are known, then those may provided instead of \code{q} and the returned bounds on the CDF will be valid for an \code{q} in \code{[ql,qu]}.  If \code{q} is provided, \code{ql} and \code{qu} are ignored.
-
-The returned function has two optional, logical arguments.  \code{lower.tail} returns 1 minus the bounds when \code{TRUE} (not used if \code{density}==TRUE) and is highly recommended for those interested in the upper tail of \eqn{Q_f}.  \code{log.p} returns the desired bounds in log space.
+The returned bounds function takes as arguments either a single vector of observed values \code{q} at which to calculate bounds. If \code{q} is not known exactly, but only a lower bound \code{ql} and an upper bound \code{qu} are known, then those may provided instead of \code{q} and the returned bounds on the CDF will be valid for an \code{q} in \code{[ql,qu]}.  If \code{q} is provided, \code{ql} and \code{qu} are ignored.
+The bounds function itself returns a dataframe with four columns: \code{c("lower.bound","upper.bound","one.minus.lower.bound","one.minus.upper.bound")}.  The first and second columns are lower and upper bounds on the CDF at \code{q} respectively; the third and fourth columns are equal to one minus the first two columns but calculated separately by the function internally in order to maintain numerical precision in the upper tail.  Thus, it is strongly recommneded that users interested in upper tail p-values use the third and fourth columns rather than the first and second.
 }
 \examples{
 
@@ -55,4 +54,7 @@ plot(x, cdf(x), type = "l")
 points(xx, y$lower, col = "blue")
 points(xx, y$upper, col = "red")
 
+}
+\seealso{
+\code{\link{QFGauss}}, \code{\link{TestQFGaussBounds}}
 }

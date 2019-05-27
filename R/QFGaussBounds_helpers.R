@@ -1,3 +1,34 @@
+####################
+# Convenient function for directly calculating the target bounds with Quadrature (fails in the tails, hence the rest of these functions)
+####################
+RawQFGaussBounds <- function(cdf, f= "identity", max.abs.eta, sum.eta, sum.etasq, sum.eta.deltasq = 0, sum.etasq.deltasq = 0){
+
+  nu <- 8*sum.etasq.deltasq + 4*sum.etasq
+  L <- 1/(4*max.abs.eta)
+  Er <- sum.eta.deltasq + sum.eta
+
+  u <- function(y) ifelse(y <= 0, 1, ifelse(y < nu*L,exp(-0.5*(y^2)/nu),exp(0.5*nu*L^2-y*L) ))
+  lower.integrand <- function(t,q){
+    A <- cdf(t,density = T)
+    ifelse(is.infinite(A),.Machine$double.xmax,A)*u(q - Er- t)}
+  upper.integrand <- function(t,q){
+    A <- cdf(t,density = T)
+    ifelse(is.infinite(A),.Machine$double.xmax,A)*u(-(q - Er- t))}
+
+  prelim.raw.bounds <- function(obs){
+    lower <- max(0,cdf(obs-Er) - integrate(lower.integrand,lower = -Inf,upper=obs-Er,rel.tol = 1e-20,stop.on.error = FALSE,q = obs)$value)
+    upper <- min(1,cdf(obs-Er) + integrate(upper.integrand,lower = obs-Er,upper=Inf,rel.tol = 1e-20,stop.on.error = FALSE, q = obs)$value)
+    ans <- c(lower,upper,1-lower,1-upper)
+    names(ans) <- c("lower.bound","upper.bound","one.minus.lower.bound","one.minus.upper.bound")
+    ans
+  }
+
+  function(obs, parallel.sapply = sapply){
+    t(parallel.sapply(obs,prelim.raw.bounds))
+  }
+  # Return function that takes in observed values
+}
+
 
 ###################################
 # Essential Integration Functions #
@@ -89,12 +120,12 @@ expG4 <- function(from, to, mu, nu ){
 }
 
 
-G5 <- function(from, to, b, nu ){
-  if(any(from<0)){stop("from must be >= 0")}
-  if(any(to<from)){warning("some to > from, so for those values returning -Inf")}
-  if(b>=2){stop("b must be < 2")}
-  ifelse(to<=from,-Inf,-log(2) + G2(from^2,to^2,b/2,1/(2*nu)))
-}
+# G5 <- function(from, to, b, nu ){
+#   if(any(from<0)){stop("from must be >= 0")}
+#   if(any(to<from)){warning("some to > from, so for those values returning -Inf")}
+#   if(b>=2){stop("b must be < 2")}
+#   ifelse(to<=from,-Inf,-log(2) + G2(from^2,to^2,b/2,1/(2*nu)))
+# }
 # #G5 is correct
 # print(exp(G5(-5,0:10,-2,2)),digits=22)
 # print(integrate(f=function(z,b,nu){z^(1-b)*exp(-0.5*z^2/nu)},lower = 1,upper = 4,b=-20,nu=.02)$value,digits=22)
@@ -131,11 +162,12 @@ WrapConcIneq.identity <- function(c1,c2,nu,L){
       ifelse(t >= q-c1, 0 , ifelse(t > q-c1-nu*L, (q-c1-t)*exp(-0.5*((q-c1-t)^2)/nu)/nu,L*exp(0.5*nu*L^2-(q-c1)*L+L*t)))
     },
     "int.h1.const" = function(lower, upper, q, one.minus = FALSE){
-      if(lower>=upper){return(0)}
       if(one.minus){
-       res <- 1 - u(q-c1-upper) + u(q-c1-lower)
+        if(lower>=upper){return(1)}
+        res <- 1 - u(q-c1-upper) + u(q-c1-lower)
       }else{
-      res <- u(q-c1-upper) - u(q-c1-lower)
+        if(lower>=upper){return(0)}
+        res <- u(q-c1-upper) - u(q-c1-lower)
       }
       res
     },
@@ -178,10 +210,11 @@ WrapConcIneq.identity <- function(c1,c2,nu,L){
       ifelse(t <= q-c2, 0 , ifelse(t < q-c2+nu*L, (c2-q+t)*exp(-0.5*((c2-q+t)^2)/nu)/nu,L*exp(0.5*nu*L^2-(c2-q)*L-L*t)))
     },
     "int.h2.const" = function(lower, upper, q, one.minus = FALSE){
-      if(lower>=upper){return(0)}
       if(one.minus){
+        if(lower>=upper){return(1)}
         res <- 1 - u(c2-q+lower) + u(c2-q+upper)
       }else{
+        if(lower>=upper){return(0)}
         res <- u(c2-q+lower) - u(c2-q+upper)
       }
       res

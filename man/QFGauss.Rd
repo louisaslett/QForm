@@ -4,7 +4,8 @@
 \alias{QFGauss}
 \title{CDF/PDF of a Quadratic Form in Gaussians}
 \usage{
-QFGauss(f.eta, delta = rep(0, length(f.eta)), n = 2^16 - 1)
+QFGauss(f.eta, delta = rep(0, length(f.eta)), n = 2^16 - 1,
+  parallel.sapply = base::sapply)
 }
 \arguments{
 \item{f.eta}{vector; real-valued coefficients, \eqn{f(\eta_i)}, (may be positive or negative)}
@@ -12,6 +13,8 @@ QFGauss(f.eta, delta = rep(0, length(f.eta)), n = 2^16 - 1)
 \item{delta}{vector; mean shifts for each \eqn{Z_i}}
 
 \item{n}{numeric; number of points at which to evaluate the characteristic function of \eqn{T_f}, must be odd (see Details).}
+
+\item{parallel.sapply}{function; a user-provided version of \code{sapply}, see Details.}
 }
 \value{
 A function that evaluates the CDF or PDF of \eqn{T_f}.
@@ -21,6 +24,8 @@ Returns the CDF and PDF for random variables \eqn{T_f}{T_f} of the form \deqn{T_
 }
 \details{
 The returned function has three optional, logical arguments.  The first is a \code{density}, which when \code{TRUE}, prompts the function to evaluate the PDF rather than the CDF.  \code{density} defaults to FALSE.  \code{lower.tail} returns 1 minus the CDF when \code{TRUE} (not used if \code{density}==TRUE) and is highly recommended for those interested in the upper tail of \eqn{T_f}.  \code{log.p} returns the desired probabilities in log space.
+
+\code{parallel.sapply}, by default, is set to \code{base:sapply}.  However, it allows the user to supply a parallelized version of \code{sapply} (eg: \code{future_sapply} from the \code{future.apply} package) to help speed up the calculation of the CDF.  This is helpful in cases where \code{length(f.eta)} is large.
 
 \code{n} is the number of sub-intervals used in the left-sided Reimann integral approximation of the Fourier transform carried out by \code{stats::fft}.  The default 2^16-1 should work for the vast majority of cases, but n may need to be increased to achieve accurate CDF estimation when \eqn{T_f} has many terms (when \code{f.eta} is long).
 
@@ -44,6 +49,11 @@ x <- seq(-1500, 2000, len = 1e3)
 plot(x,cdf(x),type="l") # ECDF
 
 # Compare computed CDF to empirical CDF of target distribution based on 10,000 samples
-test(cdf)
+TestQFGauss(cdf)
 
+
+
+}
+\seealso{
+\code{\link{QFGaussBounds}}, \code{\link{TestQFGauss}}
 }
