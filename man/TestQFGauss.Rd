@@ -22,6 +22,10 @@ Four plots are produced.  The top-left plot overlays the CDF computed by QFGauss
 The top-right plot shows the distance between the empirical and QFGauss-computed CDF and the corresponding ks.test p-value (two-sided alternative).
 The two bottom plots compare the empirical CDF (in red) with the computed CDF (in black) in each tail.
 }
+\examples{
+TestQFGauss(QFGauss(c(1,3,4,-3)))
+
+}
 \seealso{
 \code{\link{QFGauss}}, \code{\link{TestQFGaussBounds}}
 }

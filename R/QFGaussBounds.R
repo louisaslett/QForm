@@ -29,13 +29,13 @@
 #'
 #' xx <- seq(-1e3, 1e3, len = 6)
 #' ## This may take 5 - 10 secs.
-#' y <- as.data.frame(t(mapply(bounds, ql = xx-1, qu = xx+1)))
+#' y <- bounds(xx)
 #'
 #' x <- seq(-1e3, 1e3, len = 1e3)
 #' plot(x, cdf(x), type = "l")
 #'
-#' points(xx, y$lower, col = "blue")
-#' points(xx, y$upper, col = "red")
+#' points(xx, y$lower.bound, col = "blue")
+#' points(xx, y$upper.bound, col = "red")
 #'
 #' @export
 QFGaussBounds <- function(cdf, f = "identity", max.abs.eta, sum.eta, sum.etasq, sum.eta.deltasq = 0, sum.etasq.deltasq = 0){
@@ -205,8 +205,6 @@ QFGaussBounds <- function(cdf, f = "identity", max.abs.eta, sum.eta, sum.etasq, 
 
     }
 
-
- #browser()
     # Sum across components
 
     one.minus.upper.components <- - upper.components
@@ -269,6 +267,8 @@ QFGaussBounds <- function(cdf, f = "identity", max.abs.eta, sum.eta, sum.etasq, 
 #' @param parallel.sapply function; a user-provided version of \code{sapply}, see Details.
 #' @return There is nothing returned.
 #' @seealso \code{\link{QFGaussBounds}}, \code{\link{TestQFGauss}}
+#' @examples
+#' TestQFGaussBounds(QFGauss(c(1,5,-4,-3),c(2,-1,4,-5)),2)
 #' @export
 TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.eta"))/2)), n.bound.points = 20,
                               lower.tail.end = 20, upper.tail.end = 20, parallel.sapply = base::sapply){

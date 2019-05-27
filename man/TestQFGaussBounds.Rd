@@ -15,9 +15,9 @@ TestQFGaussBounds(fullcdf, k = min(20, floor(length(attr(fullcdf,
 
 \item{n.bound.points}{numeric; the number of points at which to evaluate the bounds for plotting}
 
-\item{lower.tail.end}{numeric; the -log_10 lower tail probability at which to start each x-axis}
+\item{lower.tail.end}{numeric; the -log_10 lower tail probability at which to start each x-axis (default = 20)}
 
-\item{upper.tail.end}{numeric; the -log_10 upper tail probability at which to end each x-axis}
+\item{upper.tail.end}{numeric; the -log_10 upper tail probability at which to end each x-axis (default = 20 )}
 
 \item{parallel.sapply}{function; a user-provided version of \code{sapply}, see Details.}
 }
@@ -34,6 +34,9 @@ The upper and lower bounds on \code{fullcdf} computed by a naive quadrature-base
 The top-right plot shows the difference between the truncated approximation of the CDF and \code{fullcdf} in log space.  It may be interpretted as follows.  The x-axis plots the -log_10 p-value one would have reported based on the truncated approximation alone.  The y-axis is the difference between
 the true -log_10 p-value and the approximate -log_10 p-value.  The difference in p-values in the upper tail is plotted with a solid line.  The difference in p-values in the lower tail is plotted with a dashed line.  This plot effectively shows how far one might be misled by the truncated approximation shifted by the expectation of the remainder terms.
 The two bottom plots show the top-left plot, just on the log-scale, to focus on each tail separately.
+}
+\examples{
+TestQFGaussBounds(QFGauss(c(1,5,-4,-3),c(2,-1,4,-5)),2)
 }
 \seealso{
 \code{\link{QFGaussBounds}}, \code{\link{TestQFGauss}}

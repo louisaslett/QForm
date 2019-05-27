@@ -46,13 +46,13 @@ bounds <- QFGaussBounds(cdf = cdf, f = "identity",
 
 xx <- seq(-1e3, 1e3, len = 6)
 ## This may take 5 - 10 secs.
-y <- as.data.frame(t(mapply(bounds, ql = xx-1, qu = xx+1)))
+y <- bounds(xx)
 
 x <- seq(-1e3, 1e3, len = 1e3)
 plot(x, cdf(x), type = "l")
 
-points(xx, y$lower, col = "blue")
-points(xx, y$upper, col = "red")
+points(xx, y$lower.bound, col = "blue")
+points(xx, y$upper.bound, col = "red")
 
 }
 \seealso{

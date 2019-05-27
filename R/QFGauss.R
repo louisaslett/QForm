@@ -152,6 +152,7 @@ QFGauss <- function(f.eta, delta = rep(0,length(f.eta)), n = 2^16-1, parallel.sa
 #' Plots the CDF computed by QFGauss.
 #'
 #' @param cdf a QFGaussCDF
+#' @param ... additional parameters
 #' @return There is nothing returned.
 #'
 #' @export
@@ -221,6 +222,9 @@ plot.QFGaussCDF <- function(cdf,...){
 #' @param n.samps number of draws from the target distribution with which to construct the empirical CDF
 #' @return Nothing is returned.
 #' @seealso \code{\link{QFGauss}}, \code{\link{TestQFGaussBounds}}
+#' @examples
+#' TestQFGauss(QFGauss(c(1,3,4,-3)))
+#'
 #' @export
 TestQFGauss <- function(cdf, n.samps = 1e4){
 

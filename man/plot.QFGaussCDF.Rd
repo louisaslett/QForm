@@ -8,6 +8,8 @@
 }
 \arguments{
 \item{cdf}{a QFGaussCDF}
+
+\item{...}{additional parameters}
 }
 \value{
 There is nothing returned.
