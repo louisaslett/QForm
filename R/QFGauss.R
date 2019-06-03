@@ -1,6 +1,8 @@
-#' CDF/PDF of a Quadratic Form in Gaussians
+#' Fast CDF/PDF of a Quadratic Form in Gaussians
 #'
 #' Returns the CDF and PDF for random variables \eqn{T_f}{T_f} of the form \deqn{T_f = \sum\limits_i f\left(\eta_i \right) \left(Z_i + \delta_i)^2}{T_f = \Sigma_i f (\eta_i) (Z_i + \delta_i)^2} where \eqn{Z_i \sim N(0,1).}{Z_i ~ N(0,1).}
+#'
+#' By using the fast Fourier transform and various adjustments for numerical precision, this function is much faster and more reliable than Davie's method and related approaches.
 #'
 #' The returned function has three optional, logical arguments.  The first is a \code{density}, which when \code{TRUE}, prompts the function to evaluate the PDF rather than the CDF.  \code{density} defaults to FALSE.  \code{lower.tail} returns 1 minus the CDF when \code{TRUE} (not used if \code{density}==TRUE) and is highly recommended for those interested in the upper tail of \eqn{T_f}.  \code{log.p} returns the desired probabilities in log space.
 #'
@@ -8,11 +10,11 @@
 #'
 #' \code{n} is the number of sub-intervals used in the left-sided Reimann integral approximation of the Fourier transform carried out by \code{stats::fft}.  The default 2^16-1 should work for the vast majority of cases, but n may need to be increased to achieve accurate CDF estimation when \eqn{T_f} has many terms (when \code{f.eta} is long).
 #'
-#' Since \code{stats::fft} can only evaluate the CDF up to double precision, we extrapolate the tails of \eqn{T_f}.  QForm automatically detects the region where the estimated CDF begins to lose precision.  A log-linear function is used for tails that go out to infinity and a log-monomial functions is used for tails truncated at 0 (when all of the \code{f.eta} have the same sign).  These extrapolated tails, motivated by the form of the characteristic function, provide accurate approximations in most cases when compared against a quad-precision implementation (not yet included in \code{QForm}).
+#' Since \code{stats::fft} can only evaluate the CDF up to double precision, we extrapolate the tails of \eqn{T_f}.  QForm automatically detects the region where the estimated CDF begins to lose precision.  A log-linear function is used for tails that go out to infinity and a function of the form \eqn{\alpha |x|^\beta} is used for tails truncated at 0 (when all of the \code{f.eta} have the same sign).  These extrapolated tails, motivated by the form of the characteristic function, provide accurate approximations in most cases when compared against a quad-precision implementation (not yet included in \code{QForm}).
 #'
 #' Our current tail extrapolation scheme can struggle in cases where the target distribution is extremely skewed, since that leaves fewer points from the FFT with which to perform extrapolation on one of the tails.  We plan to address this in future versions by deploying a second FFT when needed.
 #'
-#' A note on unbounded densities: The density of \eqn{T_f} if guaranteed to be bounded if length(f.eta) > 2 and there is no trouble in density estimation posed by asymptotes.  In the length(f.eta)==2 case, if the two components of f.eta are of opposite signs, then the density of \eqn{T_f}{T_f} may have an asymptote at some value \eqn{t}{t}.  While the density in the neighborhood around that \eqn{t} should be accurately calculated, due to the FFT and spline interpolation approach used, the density reported at \eqn{t}{t} may be reported as some finite rather than as Inf.  In the length(f.eta)==1 case, QFGauss resorts to dchisq and the density at 0 is accurately reported as Inf.
+#' A note on unbounded densities: The density of \eqn{T_f} is guaranteed to be bounded if length(f.eta) > 2 and there is no trouble in density estimation posed by asymptotes.  In the length(f.eta)==2 case, if the two components of f.eta are of opposite signs, then the density of \eqn{T_f}{T_f} may have an asymptote at some value \eqn{t}{t}.  While the density in the neighborhood around that \eqn{t} should be accurately calculated, due to the FFT and spline interpolation approach used, the density reported at \eqn{t}{t} may be reported as some finite rather than as Inf.  In the length(f.eta)==1 case, QFGauss resorts to dchisq and the density at 0 is accurately reported as Inf.
 #'
 #'
 #' @param f.eta vector; real-valued coefficients, \eqn{f(\eta_i)}, (may be positive or negative)
@@ -33,10 +35,20 @@
 #'
 #' # Plot computed CDF at desired points
 #' x <- seq(-1500, 2000, len = 1e3)
-#' plot(x,cdf(x),type="l") # ECDF
+#' plot(x,cdf(x),type="l", ylab = expression(CDF),xlab=expression(T[f]), main=expression(CDF~of~T[f])) # CDF
+#' plot(x,cdf(x,density = T),type="l", ylab = expression(PDF),xlab=expression(T[f]), main=expression(PDF~of~T[f])) # PDF
 #'
 #' # Compare computed CDF to empirical CDF of target distribution based on 10,000 samples
 #' TestQFGauss(cdf)
+#'
+#' # QFGauss can be accelerated by passing it a parallel version of sapply
+#' \dontrun{
+#' # In this example we use only 2 parallel workers but more may be added
+#' require(future.apply); plan(tweak(multiprocess,workers = 2))
+#' f.eta <- 5 * rnorm(500)
+#' system.time(cdf <- QFGauss(f.eta))
+#' system.time(cdf <- QFGauss(f.eta, parallel.sapply = future_sapply))
+#' }
 #'
 #'
 #'
@@ -205,18 +217,18 @@ plot.QFGaussCDF <- function(cdf,...){
   }
 
   old.par <- par(no.readonly = T)
-  plot(x, cdf(x), type = "l", lwd=1.5, ylab = expression(CDF)) # plot lower tail of CDF
+  plot(x, cdf(x), type = "l", lwd=1.5, ylab = expression(CDF),xlab=expression(T[f])) # plot lower tail of CDF
   par(old.par)
 }
 
 
 #' Test function for a QFGaussCDF object
 #'
-#' Compares the CDF inferred by QFGauss to an empicical CDF.
+#' Compares the CDF inferred by QFGauss to an empirical CDF.
 #'
 #' Four plots are produced.  The top-left plot overlays the CDF computed by QFGauss (in black) and the empirical CDF (in red) based on 10,000 samples.
 #' The top-right plot shows the distance between the empirical and QFGauss-computed CDF and the corresponding ks.test p-value (two-sided alternative).
-#' The two bottom plots compare the empirical CDF (in red) with the computed CDF (in black) in each tail.
+#' The two bottom plots allow comparison of the empirical CDF (in red) with the computed CDF (in black) in each tail.
 #'
 #' @param cdf a QFGaussCDF
 #' @param n.samps number of draws from the target distribution with which to construct the empirical CDF
@@ -281,21 +293,21 @@ TestQFGauss <- function(cdf, n.samps = 1e4){
   samps <- c(colSums(f.eta * (matrix(rnorm(n.samps * length(f.eta)), nrow = length(f.eta)) + delta)^2))
   qecdf <- ecdf(samps)
 
-  plot(x, cdf(x), type = "l", lwd=1.5, ylab = expression(CDF)) # plot lower tail of CDF
+  plot(x, cdf(x), type = "l", lwd=1.5, ylab = expression(CDF),xlab=expression(T[f]), main=expression(CDF~of~T[f])) # plot lower tail of CDF
   lines(x, qecdf(x), lwd=1,col="red") # plot lower tail of CDF
   #legend("topleft",legend=c("QForm CDF","ECDF"),col=c("black","blue"),lty=c(1,3))
 
-  plot(x,cdf(x)-qecdf(x), type="l",main=paste("ks.test p-value:",ks.test(samps,cdf)$p.value),lwd=1.5)
+  plot(x,cdf(x)-qecdf(x), type="l",ylab = expression(CDF - ECDF), xlab=expression(T[f]), main=paste("Comparison to ECDF: ks.test p-value =",signif(ks.test(samps,cdf)$p.value,2)),lwd=1.5,font.main=1)
   abline(h=0)
 
   plot(x, -cdf(x, log.p = TRUE)/log(10), type = "l",
-       ylab = expression(-log[10](CDF)) )
+       ylab = expression(-log[10](CDF)), main=expression(-log[10](CDF)), xlab=expression(T[f]))
   lines(x,-log10(qecdf(x)),col="red")
   #legend("topright",legend=c("QForm CDF","ECDF"),col=c("black","blue"),lty=c(1,3))
 
 
   plot(x, -cdf(x, lower.tail = FALSE, log.p = TRUE)/log(10), type = "l",
-       ylab = expression(-log[10](1 - CDF))) # plot upper tail of CDF
+       ylab = expression(-log[10](1 - CDF)),main=expression(-log[10](1-CDF)), xlab=expression(T[f])) # plot upper tail of CDF
   lines(x,-log1p(-qecdf(x))/log(10),col="red")
   #legend("topleft",legend=c("QForm CDF","ECDF"),col=c("black","blue"),lty=c(1,3))
 

@@ -2,7 +2,7 @@
 % Please edit documentation in R/QFGauss.R
 \name{QFGauss}
 \alias{QFGauss}
-\title{CDF/PDF of a Quadratic Form in Gaussians}
+\title{Fast CDF/PDF of a Quadratic Form in Gaussians}
 \usage{
 QFGauss(f.eta, delta = rep(0, length(f.eta)), n = 2^16 - 1,
   parallel.sapply = base::sapply)
@@ -23,17 +23,19 @@ A function that evaluates the CDF or PDF of \eqn{T_f}.
 Returns the CDF and PDF for random variables \eqn{T_f}{T_f} of the form \deqn{T_f = \sum\limits_i f\left(\eta_i \right) \left(Z_i + \delta_i)^2}{T_f = \Sigma_i f (\eta_i) (Z_i + \delta_i)^2} where \eqn{Z_i \sim N(0,1).}{Z_i ~ N(0,1).}
 }
 \details{
+By using the fast Fourier transform and various adjustments for numerical precision, this function is much faster and more reliable than Davie's method and related approaches.
+
 The returned function has three optional, logical arguments.  The first is a \code{density}, which when \code{TRUE}, prompts the function to evaluate the PDF rather than the CDF.  \code{density} defaults to FALSE.  \code{lower.tail} returns 1 minus the CDF when \code{TRUE} (not used if \code{density}==TRUE) and is highly recommended for those interested in the upper tail of \eqn{T_f}.  \code{log.p} returns the desired probabilities in log space.
 
 \code{parallel.sapply}, by default, is set to \code{base:sapply}.  However, it allows the user to supply a parallelized version of \code{sapply} (eg: \code{future_sapply} from the \code{future.apply} package) to help speed up the calculation of the CDF.  This is helpful in cases where \code{length(f.eta)} is large.
 
 \code{n} is the number of sub-intervals used in the left-sided Reimann integral approximation of the Fourier transform carried out by \code{stats::fft}.  The default 2^16-1 should work for the vast majority of cases, but n may need to be increased to achieve accurate CDF estimation when \eqn{T_f} has many terms (when \code{f.eta} is long).
 
-Since \code{stats::fft} can only evaluate the CDF up to double precision, we extrapolate the tails of \eqn{T_f}.  QForm automatically detects the region where the estimated CDF begins to lose precision.  A log-linear function is used for tails that go out to infinity and a log-monomial functions is used for tails truncated at 0 (when all of the \code{f.eta} have the same sign).  These extrapolated tails, motivated by the form of the characteristic function, provide accurate approximations in most cases when compared against a quad-precision implementation (not yet included in \code{QForm}).
+Since \code{stats::fft} can only evaluate the CDF up to double precision, we extrapolate the tails of \eqn{T_f}.  QForm automatically detects the region where the estimated CDF begins to lose precision.  A log-linear function is used for tails that go out to infinity and a function of the form \eqn{\alpha |x|^\beta} is used for tails truncated at 0 (when all of the \code{f.eta} have the same sign).  These extrapolated tails, motivated by the form of the characteristic function, provide accurate approximations in most cases when compared against a quad-precision implementation (not yet included in \code{QForm}).
 
 Our current tail extrapolation scheme can struggle in cases where the target distribution is extremely skewed, since that leaves fewer points from the FFT with which to perform extrapolation on one of the tails.  We plan to address this in future versions by deploying a second FFT when needed.
 
-A note on unbounded densities: The density of \eqn{T_f} if guaranteed to be bounded if length(f.eta) > 2 and there is no trouble in density estimation posed by asymptotes.  In the length(f.eta)==2 case, if the two components of f.eta are of opposite signs, then the density of \eqn{T_f}{T_f} may have an asymptote at some value \eqn{t}{t}.  While the density in the neighborhood around that \eqn{t} should be accurately calculated, due to the FFT and spline interpolation approach used, the density reported at \eqn{t}{t} may be reported as some finite rather than as Inf.  In the length(f.eta)==1 case, QFGauss resorts to dchisq and the density at 0 is accurately reported as Inf.
+A note on unbounded densities: The density of \eqn{T_f} is guaranteed to be bounded if length(f.eta) > 2 and there is no trouble in density estimation posed by asymptotes.  In the length(f.eta)==2 case, if the two components of f.eta are of opposite signs, then the density of \eqn{T_f}{T_f} may have an asymptote at some value \eqn{t}{t}.  While the density in the neighborhood around that \eqn{t} should be accurately calculated, due to the FFT and spline interpolation approach used, the density reported at \eqn{t}{t} may be reported as some finite rather than as Inf.  In the length(f.eta)==1 case, QFGauss resorts to dchisq and the density at 0 is accurately reported as Inf.
 }
 \examples{
 f.eta <- c(-12, -7, 5, 7, -9, 10, 8)
@@ -46,10 +48,20 @@ plot(cdf)
 
 # Plot computed CDF at desired points
 x <- seq(-1500, 2000, len = 1e3)
-plot(x,cdf(x),type="l") # ECDF
+plot(x,cdf(x),type="l", ylab = expression(CDF),xlab=expression(T[f]), main=expression(CDF~of~T[f])) # CDF
+plot(x,cdf(x,density = T),type="l", ylab = expression(PDF),xlab=expression(T[f]), main=expression(PDF~of~T[f])) # PDF
 
 # Compare computed CDF to empirical CDF of target distribution based on 10,000 samples
 TestQFGauss(cdf)
+
+# QFGauss can be accelerated by passing it a parallel version of sapply
+\dontrun{
+# In this example we use only 2 parallel workers but more may be added
+require(future.apply); plan(tweak(multiprocess,workers = 2))
+f.eta <- 5 * rnorm(500)
+system.time(cdf <- QFGauss(f.eta))
+system.time(cdf <- QFGauss(f.eta, parallel.sapply = future_sapply))
+}
 
 
 

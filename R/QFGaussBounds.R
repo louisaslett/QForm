@@ -1,11 +1,14 @@
 #' Bounds on the CDF of a Quadratic Form in Gaussians
 #'
-#' Returns a function for calculating upper and lower bounds on the CDF for random variables \eqn{Q_f = T_f + R_f} where \deqn{T_f = \sum\limits_{i \in \mathcal{T}} f\left(\eta_i \right) \left(Z_i + \delta_i)^2, \ \ \ \ R_f = \sum\limits_{i \in \mathcal{R}} f\left(\eta_i \right) \left(Z_i + \delta_i)^2}{T_f = \Sigma_{i \in T} f (\eta_i) (Z_i + \delta_i)^2,     R_f = \Sigma_{i \in R} f (\eta_i) (Z_i + \delta_i)^2,} \eqn{Z_i \sim N(0,1)}{Z_i ~ N(0,1)}, and only the CDF of \eqn{T_f} is known.
+#' Returns a function for calculating upper and lower bounds on the CDF for random variables \eqn{Q_f = T_f + R_f} where \deqn{T_f = \sum\limits_{i \in \mathcal{T}} f\left(\eta_i \right) \left(Z_i + \delta_i)^2,}{T_f = \Sigma_{i \in T} f (\eta_i) (Z_i + \delta_i)^2,}
+#' \deqn{R_f = \sum\limits_{i \in \mathcal{R}} f\left(\eta_i \right) \left(Z_i + \delta_i)^2,}{R_f = \Sigma_{i \in R} f (\eta_i) (Z_i + \delta_i)^2,} where \eqn{Z_i \sim N(0,1)}{Z_i ~ N(0,1)}, and only the CDF of \eqn{T_f} is known.
 #'
-#' Currently only \eqn{f = "identity"} is supported, but future versions will allow one to select \eqn{f} from a list or specify their own function with it's corresponding bounds through a QFormFunction object.
+#' Currently only \eqn{f = "identity"} is supported, but future versions will allow one to select \eqn{f} from a list or specify their own function with its corresponding bounds through a QFormFunction object.
 #'
-#' The returned bounds function takes as arguments either a single vector of observed values \code{q} at which to calculate bounds. If \code{q} is not known exactly, but only a lower bound \code{ql} and an upper bound \code{qu} are known, then those may provided instead of \code{q} and the returned bounds on the CDF will be valid for an \code{q} in \code{[ql,qu]}.  If \code{q} is provided, \code{ql} and \code{qu} are ignored.
-#' The bounds function itself returns a dataframe with four columns: \code{c("lower.bound","upper.bound","one.minus.lower.bound","one.minus.upper.bound")}.  The first and second columns are lower and upper bounds on the CDF at \code{q} respectively; the third and fourth columns are equal to one minus the first two columns but calculated separately by the function internally in order to maintain numerical precision in the upper tail.  Thus, it is strongly recommneded that users interested in upper tail p-values use the third and fourth columns rather than the first and second.
+#' The returned bounds function takes a vector of observed values \code{q} at which to calculate bounds as it's main argument. If \code{q} is not known exactly, but only a lower bound \code{ql} and an upper bound \code{qu} are known, then those may provided instead of \code{q} and the returned bounds on the CDF will be valid for a \code{q} in \code{[ql,qu]}.  If \code{q} is provided, \code{ql} and \code{qu} are ignored.
+#' The returned bounds function itself returns a dataframe with four columns: \code{c("lower.bound","upper.bound","one.minus.lower.bound","one.minus.upper.bound")}.  The first and second columns are lower and upper bounds on the CDF at \code{q} respectively; the third and fourth columns are equal to one minus the first two columns but calculated separately by the function internally in order to maintain numerical precision in the upper tail.  Thus, it is strongly recommneded that users interested in upper tail p-values use the third and fourth columns rather than the first and second.
+#'
+#' The returned bounds function can also take a parallel version of sapply from a given R parallelization package via the optional argument \code{parallel.sapply}.  This can substantially speed up computation for long \code{q}.  See Example below and \code{\link{QFGauss}} for more details.
 #'
 #' @param cdf function; the cdf of \eqn{T_f} returned by \code{QForm::QForm}
 #' @param f character or QFormFunction object; the function \eqn{f} for the \eqn{Q_f} of interest.
@@ -27,22 +30,32 @@
 #' bounds <- QFGaussBounds(cdf = cdf, f = "identity",
 #'                         max.abs.eta = 10, sum.eta = 5, sum.etasq = 200)
 #'
+#' \dontrun{
+#' # Evaluate the bounds at a set of points
 #' xx <- seq(-1e3, 1e3, len = 6)
 #' ## This may take 5 - 10 secs.
-#' y <- bounds(xx)
+#' system.time(y <- bounds(xx))
 #'
 #' x <- seq(-1e3, 1e3, len = 1e3)
-#' plot(x, cdf(x), type = "l")
-#'
+#' plot(x, cdf(x), type = "l", ylab = expression(CDF),xlab=expression(T[f]), main=expression(Bounds~on~CDF~of~T[f])) # CDF
 #' points(xx, y$lower.bound, col = "blue")
 #' points(xx, y$upper.bound, col = "red")
+#'
+#' # Generate diagnostic plots for bounds
+#' TestQFGaussBounds(QFGauss(c(1,5,-4,-3,10),c(2,-1,4,-5,5)),2)
+#'
+#' # The function returned by QFGaussBounds can be accelerated by passing it a parallel version of sapply
+#' # In this example we use only 2 parallel workers but more may be added
+#' require(future.apply); plan(tweak(multiprocess,workers = 2))
+#' system.time(y <- bounds(xx, parallel.sapply = future_sapply))
+#' }
 #'
 #' @export
 QFGaussBounds <- function(cdf, f = "identity", max.abs.eta, sum.eta, sum.etasq, sum.eta.deltasq = 0, sum.etasq.deltasq = 0){
 
   if(max.abs.eta <= 0){stop("max.eta must be positive")}
 
-  # This function takes a cdf generated by QFcdf and a function f with it's associated arguments and returns
+  # This function takes a cdf generated by QFcdf and a function f with its associated arguments and returns
   # a function that returns bounds
 
   # Create set of integration functions needed for integrating over the extrapolated tails of cdf corresponding to
@@ -252,12 +265,13 @@ QFGaussBounds <- function(cdf, f = "identity", max.abs.eta, sum.eta, sum.etasq, 
 #'
 #' Compares the CDF bounds inferred by QFGaussBounds to a truncated approximation of the CDF and a naive quadrature-based implementation of the bounds.
 #'
-#' Four plots are produced.  The top-left plot overlays the target, \code{fullcdf}, computed by \code{QFGauss} (in black) and a truncated approximation to that CDF (in orange) based on simply adding the expectation of the remainder terms to the top-k truncated version of \code{fullcdf}.
+#' Here, \code{fullcdf} is taken to be the CDF of the target random variable \eqn{Q_f} (see documentation of \code{\link{QFGauss}} for definitions).
+#' Four plots are produced.  The top-left plot overlays the target CDF of \eqn{Q_f}, \code{fullcdf}, computed by \code{QFGauss} (in black) and a truncated approximation to that CDF (in orange) based on simply adding the expectation of the remainder term \eqn{R_f} to the top-k truncated version of \code{fullcdf}, \eqn{T_f}.  By "top-k" here we mean taking the terms of \eqn{Q_f} with the largest magnitude coefficients, \code{f.eta}, and using that to define \eqn{T_f}, which is what is done in \code{TestQFGaussBounds} internally.  This orange line is the approximation targeted by FastSKAT and related approximation methods.
 #' The upper and lower bounds on \code{fullcdf} computed by \code{QFGaussBounds} are plotted as red and blue circles respectively.
 #' The upper and lower bounds on \code{fullcdf} computed by a naive quadrature-based implementation of the bounds are plotted as red and blue Xs respectively.
-#' The top-right plot shows the difference between the truncated approximation of the CDF and \code{fullcdf} in log space.  It may be interpretted as follows.  The x-axis plots the -log_10 p-value one would have reported based on the truncated approximation alone.  The y-axis is the difference between
+#' The top-right plot shows the difference between the truncated approximation of the CDF and \code{fullcdf} in log space.  It may be interpreted as follows.  The x-axis plots the -log_10 p-value one would have reported based on the truncated approximation alone.  The y-axis is the difference between
 #' the true -log_10 p-value and the approximate -log_10 p-value.  The difference in p-values in the upper tail is plotted with a solid line.  The difference in p-values in the lower tail is plotted with a dashed line.  This plot effectively shows how far one might be misled by the truncated approximation shifted by the expectation of the remainder terms.
-#' The two bottom plots show the top-left plot, just on the log-scale, to focus on each tail separately.
+#' The two bottom plots allow comparison of the empirical CDF (in red) with the computed CDF (in black) in each tail.
 #'
 #' @param fullcdf QFGaussCDF; the target CDF including all terms
 #' @param k numeric; the number of truncated terms provided to QFGaussBounds from which to bound fullcdf
@@ -270,7 +284,7 @@ QFGaussBounds <- function(cdf, f = "identity", max.abs.eta, sum.eta, sum.etasq, 
 #' @examples
 #' TestQFGaussBounds(QFGauss(c(1,5,-4,-3),c(2,-1,4,-5)),2)
 #' @export
-TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.eta"))/2)), n.bound.points = 20,
+TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.eta"))/2)), n.bound.points = 16,
                               lower.tail.end = 20, upper.tail.end = 20, parallel.sapply = base::sapply){
 
   message("Comparing the provided fullcdf to a truncated approximation base on the first k = ",k," terms.  This may take a minute.")
@@ -354,9 +368,11 @@ TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.e
   attr(approxfullcdf,"sigma") <- attr(tcdf,"sigma")
 
 
+  old.par <- par(no.readonly = T)
   par(mfrow=c(2,2))
 
-  plot(x,fullcdf(x),type="l",lwd=1.5) # CDF as calculated by QForm
+  plot(x,fullcdf(x),type="l",lwd=1.5,
+       ylab = expression(CDF),xlab=expression(T[f]), main=expression(CDF~of~T[f])) # CDF as calculated by QForm
   points(xx,bounds[,1],col="blue")
   points(xx,bounds[,2],col="red")
   points(xx,raw.bounds[,1],col="blue",pch=4)
@@ -382,21 +398,22 @@ TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.e
   plot(xx.uppertail,
        yy.uppertail,
        type = "l", lwd = 1.5, ylab = "Trunc. Approx. - True -log10 p-values",
-       xlab = "Truc. Approx. -log10 p-value",
+       xlab = "Trunc. Approx. -log10 p-value",
        ylim = range(pretty(c(yy.uppertail,yy.lowertail))),
        xlim = range(pretty(c(xx.uppertail,xx.lowertail))),
        main = paste("At Naive p = 1e-8, upper tail p =",
-                    signif(true.pval.uppertail,digits=3),", lower tail p =",signif(true.pval.lowertail,digits=3)
+                    signif(true.pval.uppertail,digits=3),", lower tail p =",signif(true.pval.lowertail,digits=3)),
+       font.main = 1
        )
-  )
 
   lines(xx.lowertail,
         yy.lowertail,
-        type = "l", lwd = 1.5,lty=2)
+        type = "l", lwd = 1.5,lty=3)
   abline(h=0,lty=4)
 
 
-  plot(x,-fullcdf(x,log.p = T)/log(10),type="l",lwd=1.5) # CDF as calculated by QForm
+  plot(x,-fullcdf(x,log.p = T)/log(10),type="l",lwd=1.5,
+       ylab = expression(-log[10](CDF)),main=expression(-log[10](CDF)), xlab=expression(T[f]))# CDF as calculated by QForm
   points(xx,-log10(bounds[,1]),col="blue")
   points(xx,-log10(bounds[,2]),col="red")
   points(xx,-log10(raw.bounds[,1]),col="blue",pch=4)
@@ -404,11 +421,14 @@ TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.e
   lines(x,-approxfullcdf(x,log.p = T)/log(10),type="l",col="darkorange",lwd=1.5)
 
 
-  plot(x,-fullcdf(x,lower.tail = F,log.p = T)/log(10),type="l",lwd=1.5) # CDF as calculated by QForm
+  plot(x,-fullcdf(x,lower.tail = F,log.p = T)/log(10),type="l",lwd=1.5,
+       ylab = expression(-log[10](1 - CDF)),main=expression(-log[10](1-CDF)), xlab=expression(T[f])) # CDF as calculated by QForm
   points(xx,-log10(bounds[,3]),col="blue")
   points(xx,-log10(bounds[,4]),col="red")
   points(xx,-log10(raw.bounds[,3]),col="blue",pch=4)
   points(xx,-log10(raw.bounds[,4]),col="red",pch=4)
   lines(x,-approxfullcdf(x,lower.tail = F,log.p = T)/log(10),type="l",col="darkorange",lwd=1.5)
+
+  par(old.par)
 }
 

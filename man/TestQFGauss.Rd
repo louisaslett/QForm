@@ -15,12 +15,12 @@ TestQFGauss(cdf, n.samps = 10000)
 Nothing is returned.
 }
 \description{
-Compares the CDF inferred by QFGauss to an empicical CDF.
+Compares the CDF inferred by QFGauss to an empirical CDF.
 }
 \details{
 Four plots are produced.  The top-left plot overlays the CDF computed by QFGauss (in black) and the empirical CDF (in red) based on 10,000 samples.
 The top-right plot shows the distance between the empirical and QFGauss-computed CDF and the corresponding ks.test p-value (two-sided alternative).
-The two bottom plots compare the empirical CDF (in red) with the computed CDF (in black) in each tail.
+The two bottom plots allow comparison of the empirical CDF (in red) with the computed CDF (in black) in each tail.
 }
 \examples{
 TestQFGauss(QFGauss(c(1,3,4,-3)))

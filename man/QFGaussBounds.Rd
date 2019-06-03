@@ -26,13 +26,16 @@ QFGaussBounds(cdf, f = "identity", max.abs.eta, sum.eta, sum.etasq,
 A vectorized function which evaluates upper and lower bounds on the CDF of \eqn{Q_f}.
 }
 \description{
-Returns a function for calculating upper and lower bounds on the CDF for random variables \eqn{Q_f = T_f + R_f} where \deqn{T_f = \sum\limits_{i \in \mathcal{T}} f\left(\eta_i \right) \left(Z_i + \delta_i)^2, \ \ \ \ R_f = \sum\limits_{i \in \mathcal{R}} f\left(\eta_i \right) \left(Z_i + \delta_i)^2}{T_f = \Sigma_{i \in T} f (\eta_i) (Z_i + \delta_i)^2,     R_f = \Sigma_{i \in R} f (\eta_i) (Z_i + \delta_i)^2,} \eqn{Z_i \sim N(0,1)}{Z_i ~ N(0,1)}, and only the CDF of \eqn{T_f} is known.
+Returns a function for calculating upper and lower bounds on the CDF for random variables \eqn{Q_f = T_f + R_f} where \deqn{T_f = \sum\limits_{i \in \mathcal{T}} f\left(\eta_i \right) \left(Z_i + \delta_i)^2,}{T_f = \Sigma_{i \in T} f (\eta_i) (Z_i + \delta_i)^2,}
+\deqn{R_f = \sum\limits_{i \in \mathcal{R}} f\left(\eta_i \right) \left(Z_i + \delta_i)^2,}{R_f = \Sigma_{i \in R} f (\eta_i) (Z_i + \delta_i)^2,} where \eqn{Z_i \sim N(0,1)}{Z_i ~ N(0,1)}, and only the CDF of \eqn{T_f} is known.
 }
 \details{
-Currently only \eqn{f = "identity"} is supported, but future versions will allow one to select \eqn{f} from a list or specify their own function with it's corresponding bounds through a QFormFunction object.
+Currently only \eqn{f = "identity"} is supported, but future versions will allow one to select \eqn{f} from a list or specify their own function with its corresponding bounds through a QFormFunction object.
 
-The returned bounds function takes as arguments either a single vector of observed values \code{q} at which to calculate bounds. If \code{q} is not known exactly, but only a lower bound \code{ql} and an upper bound \code{qu} are known, then those may provided instead of \code{q} and the returned bounds on the CDF will be valid for an \code{q} in \code{[ql,qu]}.  If \code{q} is provided, \code{ql} and \code{qu} are ignored.
-The bounds function itself returns a dataframe with four columns: \code{c("lower.bound","upper.bound","one.minus.lower.bound","one.minus.upper.bound")}.  The first and second columns are lower and upper bounds on the CDF at \code{q} respectively; the third and fourth columns are equal to one minus the first two columns but calculated separately by the function internally in order to maintain numerical precision in the upper tail.  Thus, it is strongly recommneded that users interested in upper tail p-values use the third and fourth columns rather than the first and second.
+The returned bounds function takes a vector of observed values \code{q} at which to calculate bounds as it's main argument. If \code{q} is not known exactly, but only a lower bound \code{ql} and an upper bound \code{qu} are known, then those may provided instead of \code{q} and the returned bounds on the CDF will be valid for a \code{q} in \code{[ql,qu]}.  If \code{q} is provided, \code{ql} and \code{qu} are ignored.
+The returned bounds function itself returns a dataframe with four columns: \code{c("lower.bound","upper.bound","one.minus.lower.bound","one.minus.upper.bound")}.  The first and second columns are lower and upper bounds on the CDF at \code{q} respectively; the third and fourth columns are equal to one minus the first two columns but calculated separately by the function internally in order to maintain numerical precision in the upper tail.  Thus, it is strongly recommneded that users interested in upper tail p-values use the third and fourth columns rather than the first and second.
+
+The returned bounds function can also take a parallel version of sapply from a given R parallelization package via the optional argument \code{parallel.sapply}.  This can substantially speed up computation for long \code{q}.  See Example below and \code{\link{QFGauss}} for more details.
 }
 \examples{
 
@@ -44,15 +47,25 @@ cdf <- QFGauss(f.eta, delta)
 bounds <- QFGaussBounds(cdf = cdf, f = "identity",
                         max.abs.eta = 10, sum.eta = 5, sum.etasq = 200)
 
+\dontrun{
+# Evaluate the bounds at a set of points
 xx <- seq(-1e3, 1e3, len = 6)
 ## This may take 5 - 10 secs.
-y <- bounds(xx)
+system.time(y <- bounds(xx))
 
 x <- seq(-1e3, 1e3, len = 1e3)
-plot(x, cdf(x), type = "l")
-
+plot(x, cdf(x), type = "l", ylab = expression(CDF),xlab=expression(T[f]), main=expression(Bounds~on~CDF~of~T[f])) # CDF
 points(xx, y$lower.bound, col = "blue")
 points(xx, y$upper.bound, col = "red")
+
+# Generate diagnostic plots for bounds
+TestQFGaussBounds(QFGauss(c(1,5,-4,-3,10),c(2,-1,4,-5,5)),2)
+
+# The function returned by QFGaussBounds can be accelerated by passing it a parallel version of sapply
+# In this example we use only 2 parallel workers but more may be added
+require(future.apply); plan(tweak(multiprocess,workers = 2))
+system.time(y <- bounds(xx, parallel.sapply = future_sapply))
+}
 
 }
 \seealso{
