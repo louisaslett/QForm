@@ -296,7 +296,7 @@ TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.e
 
   delta <- attr(fullcdf,"delta")
   mu <- attr(fullcdf,"mu")
-  sigma <- attr(fullcdf,"sigma")
+  Q.sd <- attr(fullcdf,"Q.sd")
 
   tf <- attr(fullcdf,"tail.features")
   lambda.signs <- tf$lambda.signs
@@ -310,20 +310,20 @@ TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.e
 
   if(lambda.signs == "mixed"){
     x.max <-uniroot(function(z) {- fullcdf(z,lower.tail = F,log.p = T) / log(10) - upper.tail.end},
-                    lower = ep.r, upper = ep.r + 0.1*sigma,tol = .Machine$double.eps, extendInt = "upX")$root
+                    lower = ep.r, upper = ep.r + 0.1*Q.sd,tol = .Machine$double.eps, extendInt = "upX")$root
     x.min <-uniroot(function(z) {- fullcdf(z,lower.tail = T,log.p = T) / log(10) - lower.tail.end},
-                    lower = ep.l - 0.1*sigma, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
+                    lower = ep.l - 0.1*Q.sd, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
   }
 
   if(lambda.signs == "pos"){
     x.min <- 0
     x.max <-uniroot(function(z) {- fullcdf(z,lower.tail = F,log.p = T) / log(10) - upper.tail.end},
-                    lower = ep.r, upper = ep.r + 0.1*sigma,tol = .Machine$double.eps, extendInt = "upX")$root
+                    lower = ep.r, upper = ep.r + 0.1*Q.sd,tol = .Machine$double.eps, extendInt = "upX")$root
   }
 
   if(lambda.signs == "neg"){
     x.min <-uniroot(function(z) {- fullcdf(z,lower.tail = T,log.p = T) / log(10) - lower.tail.end},
-                    lower = ep.l - 0.1*sigma, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
+                    lower = ep.l - 0.1*Q.sd, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
     x.max <- 0
   }
 
@@ -365,14 +365,14 @@ TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.e
   Er <- sum.eta.deltasq + sum.eta
   approxfullcdf <- function(x, density = FALSE, lower.tail = TRUE, log.p = FALSE) tcdf(x-Er, density = density, lower.tail = lower.tail, log.p = log.p)
   attr(approxfullcdf,"mu") <- attr(tcdf,"mu") + Er
-  attr(approxfullcdf,"sigma") <- attr(tcdf,"sigma")
+  attr(approxfullcdf,"Q.sd") <- attr(tcdf,"Q.sd")
 
 
   old.par <- par(no.readonly = T)
   par(mfrow=c(2,2))
 
   plot(x,fullcdf(x),type="l",lwd=1.5,
-       ylab = expression(CDF),xlab=expression(T[f]), main=expression(CDF~of~T[f])) # CDF as calculated by QForm
+       ylab = expression(CDF),xlab=expression(Q[f]), main=expression(CDF~of~Q[f])) # CDF as calculated by QForm
   points(xx,bounds[,1],col="blue")
   points(xx,bounds[,2],col="red")
   points(xx,raw.bounds[,1],col="blue",pch=4)
@@ -381,13 +381,13 @@ TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.e
 
 
   true.pval.uppertail <- fullcdf(suppressWarnings(uniroot(function(z) {- approxfullcdf(z,lower.tail = F,log.p = T) / log(10) - 8},
-                                         lower = attr(approxfullcdf,"mu")-2*attr(approxfullcdf,"sigma"),
-                                         upper = attr(approxfullcdf,"mu") + 0.1*attr(approxfullcdf,"sigma"),
+                                         lower = attr(approxfullcdf,"mu")-2*attr(approxfullcdf,"Q.sd"),
+                                         upper = attr(approxfullcdf,"mu") + 0.1*attr(approxfullcdf,"Q.sd"),
                                          tol = .Machine$double.eps, extendInt = "upX")$root),lower.tail = F)
 
   true.pval.lowertail <- fullcdf(suppressWarnings(uniroot(function(z) {- approxfullcdf(z,log.p = T) / log(10) - 8},
-                                         lower = attr(approxfullcdf,"mu")-0.1*attr(approxfullcdf,"sigma"),
-                                         upper = attr(approxfullcdf,"mu") + 2*attr(approxfullcdf,"sigma"),
+                                         lower = attr(approxfullcdf,"mu")-0.1*attr(approxfullcdf,"Q.sd"),
+                                         upper = attr(approxfullcdf,"mu") + 2*attr(approxfullcdf,"Q.sd"),
                                          tol = .Machine$double.eps, extendInt = "downX")$root))
 
   yy.uppertail <- -fullcdf(x,lower.tail = F, log.p = T)/log(10) + approxfullcdf(x,lower.tail = F, log.p = T)/log(10)
@@ -413,7 +413,7 @@ TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.e
 
 
   plot(x,-fullcdf(x,log.p = T)/log(10),type="l",lwd=1.5,
-       ylab = expression(-log[10](CDF)),main=expression(-log[10](CDF)), xlab=expression(T[f]))# CDF as calculated by QForm
+       ylab = expression(-log[10](CDF)),main=expression(-log[10](CDF)), xlab=expression(Q[f]))# CDF as calculated by QForm
   points(xx,-log10(bounds[,1]),col="blue")
   points(xx,-log10(bounds[,2]),col="red")
   points(xx,-log10(raw.bounds[,1]),col="blue",pch=4)
@@ -422,7 +422,7 @@ TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.e
 
 
   plot(x,-fullcdf(x,lower.tail = F,log.p = T)/log(10),type="l",lwd=1.5,
-       ylab = expression(-log[10](1 - CDF)),main=expression(-log[10](1-CDF)), xlab=expression(T[f])) # CDF as calculated by QForm
+       ylab = expression(-log[10](1 - CDF)),main=expression(-log[10](1-CDF)), xlab=expression(Q[f])) # CDF as calculated by QForm
   points(xx,-log10(bounds[,3]),col="blue")
   points(xx,-log10(bounds[,4]),col="red")
   points(xx,-log10(raw.bounds[,3]),col="blue",pch=4)

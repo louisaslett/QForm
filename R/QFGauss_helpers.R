@@ -92,12 +92,15 @@ extrapolate_tail<-function(log.cdf,xx.standardized,start,best,num.windows,right.
   list("b" = b,"best" = best,"successful"=TRUE)
   }
 
-log.rho.Q.easy.centered<-function(t,evals.s,ncps,a,mu.s){
-  complex(imaginary = -t*(a+mu.s))+sum( complex(imaginary=ncps*t*evals.s)/complex(real=1,imaginary=-2*t*evals.s)
+log.rho.Q.easy.centered<-function(t,evals.s,ncps,a,mu.s,sigma.s){
+  complex(imaginary = -t*(a+mu.s),real = -0.5*(sigma.s*t)^2)+sum( complex(imaginary=ncps*t*evals.s)/complex(real=1,imaginary=-2*t*evals.s)
                                         - 0.5*log(complex(real=1,imaginary=-2*t*evals.s))  )
 }
 
-calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, parallel.sapply = sapply) {
+
+
+
+calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), sigma = 0, n = 2^16-1, parallel.sapply = sapply) {
   # This function estimates the CDF of the truncated distribution with the identity function
   # as the function of interest
 
@@ -110,11 +113,18 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, parallel.sa
   if(!(is.integer(ncps) | is.numeric(ncps))){stop("ncps must be integer or numeric")}
   ncps <- as.numeric(ncps)
 
+  if(!(is.integer(sigma) | is.numeric(sigma))){stop("sigma must be integer or numeric")}
+  sigma <- as.numeric(sigma)
+
+  if(length(sigma)!=1){stop("sigma must have length 1")}
+
   if(length(evals)!=length(ncps)){stop("length of evals does not equal length of ncps")}
 
   if(any(ncps<0)){stop("ncps must be non-negative.")}
 
-  if(any(is.infinite(evals)) | any(is.infinite(ncps))){stop("All evals and ncps must be finite.")}
+  if(is.infinite(sigma) | any(is.infinite(evals)) | any(is.infinite(ncps))){stop("All evals and ncps must be finite.")}
+
+
 
   if(all(evals==0)){stop("All evals are 0.")}
   if(any(evals==0)){
@@ -132,57 +142,62 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, parallel.sa
 
   mu <- sum((ncps+1)*evals)
   v <- 2*(1+2*ncps)*(evals^2)
-  sigma <- sqrt(sum(v))
-  if(is.infinite(sigma)){stop("The variance of the target distribution is too large to be numerically represented on this machine.  Please consider rescaling the target and try again.")}
-  s <- sqrt(max(v))
+  Q.sd <- sqrt(sigma^2 + sum(v))
+  if(is.infinite(Q.sd)){stop("The variance of the target distribution is too large to be numerically represented on this machine.  Please consider rescaling the target and try again.")}
+  s <- sqrt(max(c(v,sigma^2)))
 
   evals.s <- evals / s
   mu.s <- mu / s
+  sigma.s <- sigma / s
 
 
   # Determine on how fine a grid we need to FFT (will determine the interval on which we estimate the density)
   ####################################
 
-  pos.semi.def <- all(evals.s>=0)
-  neg.semi.def <- all(evals.s<=0)
+  # TO FIX CURRENTLY not handling the neg.semi.def case properly because I still need to be able to flip evals.s around even when sigma!=0
+  # Think I need separate control of (pos vs neg vs all support) and (pos def, neg def -- eg: do we need to flip the sign)
+
+  pos.semi.def <- all(evals.s>=0) & sigma==0
+  neg.semi.def <- all(evals.s<=0) & sigma==0
+
+  flip.sign <- all(evals.s<=0)
 
   if(pos.semi.def){type <- "pos"}
   if(neg.semi.def){type <- "neg"}
 
 
   # If neg.semi.definite, flip all eigenvalues to make it a PSD problem (flip back later)
-  if(neg.semi.def){evals.s <- - evals.s}
-
+  if(flip.sign){evals.s <- - evals.s}
 
   b.standardized <- uniroot(function(z,nu,resid.op.norm.bd,bound) {
     # This is our concentration inequality
     ifelse(z <= nu / (4*resid.op.norm.bd),
            0.5*(z^2) / nu,
            z / (4*resid.op.norm.bd) - 0.5*nu / ((4*resid.op.norm.bd)^2) ) / log(10) - bound
-  }, lower = 0, upper = 1e3*(sigma/s),tol = .Machine$double.eps,
-  nu = 8*sum(ncps*(evals.s^2))+4*sum(evals.s^2), resid.op.norm.bd = max(evals.s), bound = 17,
+  }, lower = 0, upper = 1e3*(Q.sd/s),tol = .Machine$double.eps,
+  nu = 8*sum(ncps*(evals.s^2))+4*sum(evals.s^2)+sigma^2, resid.op.norm.bd = max(evals.s), bound = 17,
   extendInt = "upX")$root
 
   if(pos.semi.def | neg.semi.def){
-    a.standardized <- -mu.s
+    a.standardized <- -mu.s  ## TO FIX
   }else{
     a.standardized <- -uniroot(function(z,nu,resid.op.norm.bd,bound) {
       # This function is negative log of H
       ifelse(z <= nu / (4*resid.op.norm.bd),
              0.5*(z^2) / nu,
              z / (4*resid.op.norm.bd) - 0.5*nu / ((4*resid.op.norm.bd)^2) ) / log(10) - bound
-    }, lower = 0, upper = 1e3*(sigma/s),tol = .Machine$double.eps,
-    nu = 8*sum(ncps*(evals.s^2))+4*sum(evals.s^2), resid.op.norm.bd = abs(min(evals.s)), bound = 17,
+    }, lower = 0, upper = 1e3*(Q.sd/s),tol = .Machine$double.eps,
+    nu = 8*sum(ncps*(evals.s^2))+4*sum(evals.s^2)+sigma^2, resid.op.norm.bd = abs(min(evals.s)), bound = 17,
     extendInt = "upX")$root
   }
 
   # Evaluate CDF using FFT
   ######################
 
-  rho <- parallel.sapply(1:n, function(k, a.standardized, b.standardized, n, evals.s, ncps,mu.s) {
+  rho <- parallel.sapply(1:n, function(k, a.standardized, b.standardized, n, evals.s, ncps,mu.s,sigma.s) {
     exp(log.rho.Q.easy.centered((pi*n/(b.standardized-a.standardized))*(2*((k-1)/n)-1),
-                                evals.s,ncps, a.standardized,mu.s)) / (pi*(2*((k-1)/n)-1))
-  }, a.standardized = a.standardized, b.standardized = b.standardized, n = n, evals.s = evals.s, ncps = ncps, mu.s = mu.s)
+                                evals.s,ncps, a.standardized,mu.s,sigma.s)) / (pi*(2*((k-1)/n)-1))
+  }, a.standardized = a.standardized, b.standardized = b.standardized, n = n, evals.s = evals.s, ncps = ncps, mu.s = mu.s, sigma.s = sigma.s)
 
   fft_cdf <- 0.5 - (Im(fft(rho))*(-1)^(0:(n-1)))/n
 
@@ -220,7 +235,7 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, parallel.sa
 
   best.r <- ifelse(length(r0)==0, n, ctstart.r-2+min(r0)) # One point in from the trouble point
 
-  if(pos.semi.def | neg.semi.def){ # All eigenvalues are zero or positive
+  if(pos.semi.def | neg.semi.def){ # All eigenvalues are zero or positive and sigma == 0
     fft_cdf[1] <- 0
     l0 <- which(fft_cdf[2:ctstart.l] <= 0)+1
   }else{
@@ -276,7 +291,7 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, parallel.sa
     }
   }
 
-  # If we have both positive and negative eigenvalues
+  # If we have both positive and negative eigenvalues or sigma !=0
   if(!(pos.semi.def | neg.semi.def)){
 
     type <-"mixed"
@@ -313,7 +328,7 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, parallel.sa
   fft_cdf = fft_cdf[best.l:best.r]
 
   # Flip around if neg.semi.def
-  if(neg.semi.def){
+  if(flip.sign){
     xx <- -rev(xx)
     fft_cdf <- 1-rev(fft_cdf)
     limit.r <- 0
@@ -341,7 +356,7 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), n = 2^16-1, parallel.sa
        "a.r" = a.r,
        "b.r" = b.r,
        "mu" = mu,
-       "sigma" = sigma)
+       "Q.sd" = Q.sd)
   }
 
 

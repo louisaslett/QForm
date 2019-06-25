@@ -53,7 +53,7 @@
 #'
 #'
 #' @export
-QFGauss <- function(f.eta, delta = rep(0,length(f.eta)), n = 2^16-1, parallel.sapply = base::sapply){
+QFGauss <- function(f.eta, delta = rep(0,length(f.eta)), sigma = 0, n = 2^16-1, parallel.sapply = base::sapply){
 
   if(n%%2==0){stop("n must be odd")}
 
@@ -61,13 +61,17 @@ QFGauss <- function(f.eta, delta = rep(0,length(f.eta)), n = 2^16-1, parallel.sa
 
   if(all(f.eta==0)){stop("All f.eta are zero.")}
 
+  if(length(sigma)!=1){stop("sigma must have length 1")}
+
+  if(sigma < 0){stop("sigma cannot be negative")}
+
   # Reorder f.eta so that the largest magnitude f.eta come first.  Permute delta accordingly.
   f.eta.order <- order(abs(f.eta),decreasing=T)
   f.eta <- f.eta[f.eta.order]
   delta <- delta[f.eta.order]
 
 
-  if(all(f.eta==f.eta[1])){
+  if(all(f.eta==f.eta[1]) & sigma==0){
 
     df <- length(f.eta)
     C <- abs(f.eta[1])
@@ -122,7 +126,7 @@ QFGauss <- function(f.eta, delta = rep(0,length(f.eta)), n = 2^16-1, parallel.sa
       attr(cdf.func,"f.eta") <- f.eta
       attr(cdf.func,"delta") <- delta
       attr(cdf.func,"mu") <- sum(f.eta*(1+delta^2))
-      attr(cdf.func,"sigma") <- sum(2*(1+2*delta^2)*f.eta^2)
+      attr(cdf.func,"Q.sd") <- sum(2*(1+2*delta^2)*f.eta^2)
       attr(cdf.func,"tail.features") <- list("lambda.signs" = ifelse(f.eta[1] > 0,"pos","neg"),
                                              "extrapolation.point.l" = e.l,
                                              "extrapolation.point.r" = e.r,
@@ -135,16 +139,17 @@ QFGauss <- function(f.eta, delta = rep(0,length(f.eta)), n = 2^16-1, parallel.sa
   }
 
   ncps <- delta^2
-  if(any(is.infinite(f.eta)) | any(is.infinite(ncps))){stop("All f.eta and delta^2 must be finite.")}
+  if(is.infinite(sigma) | any(is.infinite(f.eta)) | any(is.infinite(ncps))){stop("sigma as well as all f.eta and delta^2 must be finite.")}
 
-  cdf <- calc.QFcdf(evals = f.eta, ncps = ncps, n = n, parallel.sapply = parallel.sapply)
+  cdf <- calc.QFcdf(evals = f.eta, ncps = ncps, sigma = sigma, n = n, parallel.sapply = parallel.sapply)
   cdf.func <- wrap.QFcdf(cdf)
 
   attr(cdf.func,"fft_used") <- TRUE
   attr(cdf.func,"f.eta") <- f.eta
   attr(cdf.func,"delta") <- delta
+  attr(cdf.func,"sigma") <- sigma
   attr(cdf.func,"mu") <- cdf$mu
-  attr(cdf.func,"sigma") <- cdf$sigma
+  attr(cdf.func,"Q.sd") <- cdf$Q.sd
   attr(cdf.func,"tail.features") <- list("lambda.signs" = cdf$type,
                                          "extrapolation.point.l" = cdf$x[1],
                                          "extrapolation.point.r" = cdf$x[cdf$n],
@@ -175,7 +180,7 @@ plot.QFGaussCDF <- function(cdf,...){
   f.eta <- attr(cdf,"f.eta")
   delta <- attr(cdf,"delta")
   mu <- attr(cdf,"mu")
-  sigma <- attr(cdf,"sigma")
+  Q.sd <- attr(cdf,"Q.sd")
 
   tf <- attr(cdf,"tail.features")
   lambda.signs <- tf$lambda.signs
@@ -198,21 +203,21 @@ plot.QFGaussCDF <- function(cdf,...){
 
   if(lambda.signs == "mixed"){
     x.max <-uniroot(function(z) {- cdf(z,lower.tail = F,log.p = T) / log(10) - 20},
-                    lower = ep.r, upper = ep.r + 0.1*sigma,tol = .Machine$double.eps, extendInt = "upX")$root
+                    lower = ep.r, upper = ep.r + 0.1*Q.sd,tol = .Machine$double.eps, extendInt = "upX")$root
     x.min <-uniroot(function(z) {- cdf(z,lower.tail = T,log.p = T) / log(10) - 20},
-                    lower = ep.l - 0.1*sigma, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
+                    lower = ep.l - 0.1*Q.sd, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
     x <- seq(x.min,x.max,len=1e5)
   }
 
   if(lambda.signs == "pos"){
     x.max <-uniroot(function(z) {- cdf(z,lower.tail = F,log.p = T) / log(10) - 20},
-                    lower = ep.r, upper = ep.r + 0.1*sigma,tol = .Machine$double.eps, extendInt = "upX")$root
+                    lower = ep.r, upper = ep.r + 0.1*Q.sd,tol = .Machine$double.eps, extendInt = "upX")$root
     x <- seq(0,x.max,len=1e5)
   }
 
   if(lambda.signs == "neg"){
     x.min <-uniroot(function(z) {- cdf(z,lower.tail = T,log.p = T) / log(10) - 20},
-                    lower = ep.l - 0.1*sigma, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
+                    lower = ep.l - 0.1*Q.sd, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
     x <- seq(x.min,0,len=1e3)
   }
 
@@ -245,8 +250,9 @@ TestQFGauss <- function(cdf, n.samps = 1e4){
   fft_used <- attr(cdf,"fft_used")
   f.eta <- attr(cdf,"f.eta")
   delta <- attr(cdf,"delta")
-  mu <- attr(cdf,"mu")
   sigma <- attr(cdf,"sigma")
+  mu <- attr(cdf,"mu")
+  Q.sd <- attr(cdf,"Q.sd")
 
   tf <- attr(cdf,"tail.features")
   lambda.signs <- tf$lambda.signs
@@ -270,27 +276,27 @@ TestQFGauss <- function(cdf, n.samps = 1e4){
 
   if(lambda.signs == "mixed"){
     x.max <-uniroot(function(z) {- cdf(z,lower.tail = F,log.p = T) / log(10) - 20},
-                    lower = ep.r, upper = ep.r + 0.1*sigma,tol = .Machine$double.eps, extendInt = "upX")$root
+                    lower = ep.r, upper = ep.r + 0.1*Q.sd,tol = .Machine$double.eps, extendInt = "upX")$root
     x.min <-uniroot(function(z) {- cdf(z,lower.tail = T,log.p = T) / log(10) - 20},
-                    lower = ep.l - 0.1*sigma, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
+                    lower = ep.l - 0.1*Q.sd, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
     x <- seq(x.min,x.max,len=1e5)
   }
 
   if(lambda.signs == "pos"){
     x.max <-uniroot(function(z) {- cdf(z,lower.tail = F,log.p = T) / log(10) - 20},
-                    lower = ep.r, upper = ep.r + 0.1*sigma,tol = .Machine$double.eps, extendInt = "upX")$root
+                    lower = ep.r, upper = ep.r + 0.1*Q.sd,tol = .Machine$double.eps, extendInt = "upX")$root
     x <- seq(0,x.max,len=1e5)
   }
 
   if(lambda.signs == "neg"){
     x.min <-uniroot(function(z) {- cdf(z,lower.tail = T,log.p = T) / log(10) - 20},
-                    lower = ep.l - 0.1*sigma, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
+                    lower = ep.l - 0.1*Q.sd, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
     x <- seq(x.min,0,len=1e5)
   }
 
   old.par <- par(no.readonly = T)
   par(mfrow=c(2,2))
-  samps <- c(colSums(f.eta * (matrix(rnorm(n.samps * length(f.eta)), nrow = length(f.eta)) + delta)^2))
+  samps <- c(colSums(f.eta * (matrix(rnorm(n.samps * length(f.eta)), nrow = length(f.eta)) + delta)^2)) + rnorm(n.samps,sd = sigma)
   qecdf <- ecdf(samps)
 
   plot(x, cdf(x), type = "l", lwd=1.5, ylab = expression(CDF),xlab=expression(T[f]), main=expression(CDF~of~T[f])) # plot lower tail of CDF
