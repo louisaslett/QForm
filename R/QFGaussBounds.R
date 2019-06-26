@@ -69,7 +69,7 @@ QFGaussBounds <- function(cdf, f = "identity", max.abs.eta, sum.eta, sum.etasq, 
 
   # Import tail features from the tail.features attribute of cdf
   tf <- attr(cdf,"tail.features")
-  lambda.signs <- tf$lambda.signs
+  support <- tf$support
   ep.l <- tf$extrapolation.point.l
   ep.r <- tf$extrapolation.point.r
   a.l <- tf$a.l
@@ -92,19 +92,19 @@ QFGaussBounds <- function(cdf, f = "identity", max.abs.eta, sum.eta, sum.etasq, 
 
     if(qu-conc.ineqs$c2 < ep.l){
 
-      if(lambda.signs=="mixed"){
+      if(support=="all.reals"){
         upper.components[2] <- conc.ineqs$int.h2.expx(qu-conc.ineqs$c2,ep.l,qu,a.l,b.l)
         upper.components[4] <- conc.ineqs$int.h2.const(ep.r,Inf,qu)
         upper.components.4.alt <- conc.ineqs$int.h2.const(ep.r,Inf,qu, one.minus = TRUE)
         upper.components[5] <- -conc.ineqs$int.h2.expx(ep.r,Inf,qu,a.r,b.r)
       }
-      if(lambda.signs=="pos"){
+      if(support=="pos.reals"){
         upper.components[2] <- conc.ineqs$int.h2.explogx(max(qu-conc.ineqs$c2,0),ep.l,qu,a.l,b.l)
         upper.components[4] <- conc.ineqs$int.h2.const(ep.r,Inf,qu)
         upper.components.4.alt <- conc.ineqs$int.h2.const(ep.r,Inf,qu, one.minus = TRUE)
         upper.components[5] <- -conc.ineqs$int.h2.expx(ep.r,Inf,qu,a.r,b.r)
       }
-      if(lambda.signs=="neg"){
+      if(support=="neg.reals"){
         upper.components[2] <- conc.ineqs$int.h2.expx(qu-conc.ineqs$c2,ep.l,qu,a.l,b.l)
         upper.components[4] <- conc.ineqs$int.h2.const(ep.r,Inf,qu) # This integrates out to infinity because we need to account for the constant plateau of the NSD density above 0
         upper.components.4.alt <- conc.ineqs$int.h2.const(ep.r,Inf,qu, one.minus = TRUE)
@@ -118,17 +118,17 @@ QFGaussBounds <- function(cdf, f = "identity", max.abs.eta, sum.eta, sum.etasq, 
 
     if((qu-conc.ineqs$c2 >= ep.l) & (qu-conc.ineqs$c2 < ep.r)){
 
-      if(lambda.signs=="mixed"){
+      if(support=="all.reals"){
         upper.components[4] <- conc.ineqs$int.h2.const(ep.r,Inf,qu)
         upper.components.4.alt <- conc.ineqs$int.h2.const(ep.r,Inf,qu, one.minus = TRUE)
         upper.components[5] <- -conc.ineqs$int.h2.expx(ep.r,Inf,qu,a.r,b.r)
       }
-      if(lambda.signs=="pos"){
+      if(support=="pos.reals"){
         upper.components[4] <- conc.ineqs$int.h2.const(ep.r,Inf,qu)
         upper.components.4.alt <- conc.ineqs$int.h2.const(ep.r,Inf,qu, one.minus = TRUE)
         upper.components[5] <- -conc.ineqs$int.h2.expx(ep.r,Inf,qu,a.r,b.r)
       }
-      if(lambda.signs=="neg"){
+      if(support=="neg.reals"){
         upper.components[4] <- conc.ineqs$int.h2.const(ep.r,Inf,qu) # This integrates out to infinity because we need to account for the constant plateau of the NSD density above 0
         upper.components.4.alt <- conc.ineqs$int.h2.const(ep.r,Inf,qu, one.minus = TRUE)
         upper.components[5] <- -conc.ineqs$int.h2.explognegx(ep.r,0,qu,a.r,b.r)
@@ -141,17 +141,17 @@ QFGaussBounds <- function(cdf, f = "identity", max.abs.eta, sum.eta, sum.etasq, 
 
     if(qu-conc.ineqs$c2 >= ep.r){
 
-      if(lambda.signs=="mixed"){
+      if(support=="all.reals"){
         upper.components[4] <- conc.ineqs$int.h2.const(qu-conc.ineqs$c2,Inf,qu)
         upper.components.4.alt <- conc.ineqs$int.h2.const(qu-conc.ineqs$c2,Inf,qu, one.minus = TRUE)
         upper.components[5] <- -conc.ineqs$int.h2.expx(qu-conc.ineqs$c2,Inf,qu,a.r,b.r)
       }
-      if(lambda.signs=="pos"){
+      if(support=="pos.reals"){
         upper.components[4] <- conc.ineqs$int.h2.const(qu-conc.ineqs$c2,Inf,qu)
         upper.components.4.alt <- conc.ineqs$int.h2.const(qu-conc.ineqs$c2,Inf,qu, one.minus = TRUE)
         upper.components[5] <- -conc.ineqs$int.h2.expx(qu-conc.ineqs$c2,Inf,qu,a.r,b.r)
       }
-      if(lambda.signs=="neg"){
+      if(support=="neg.reals"){
         upper.components[4] <- conc.ineqs$int.h2.const(qu-conc.ineqs$c2,Inf,qu) # This integrates out to infinity because we need to account for the constant plateau of the NSD density above 0
         upper.components.4.alt <- conc.ineqs$int.h2.const(qu-conc.ineqs$c2,Inf,qu, one.minus = TRUE)
         upper.components[5] <- -conc.ineqs$int.h2.explognegx(qu-conc.ineqs$c2,0,qu,a.r,b.r)
@@ -164,19 +164,19 @@ QFGaussBounds <- function(cdf, f = "identity", max.abs.eta, sum.eta, sum.etasq, 
 
     if(ql-conc.ineqs$c1 > ep.r){
 
-      if(lambda.signs=="mixed"){
+      if(support=="all.reals"){
         lower.components[2] <- conc.ineqs$int.h1.expx(-Inf,ep.l,ql,a.l,b.l)
         lower.components[4] <- conc.ineqs$int.h1.const(ep.r,ql-conc.ineqs$c1,ql)
         lower.components.4.alt <- conc.ineqs$int.h1.const(ep.r,ql-conc.ineqs$c1,ql, one.minus = TRUE)
         lower.components[5] <- -conc.ineqs$int.h1.expx(ep.r,ql-conc.ineqs$c1,ql,a.r,b.r)
       }
-      if(lambda.signs=="pos"){
+      if(support=="pos.reals"){
         lower.components[2] <- conc.ineqs$int.h1.explogx(0,ep.l,ql,a.l,b.l)
         lower.components[4] <- conc.ineqs$int.h1.const(ep.r,ql-conc.ineqs$c1,ql)
         lower.components.4.alt <- conc.ineqs$int.h1.const(ep.r,ql-conc.ineqs$c1,ql, one.minus = TRUE)
         lower.components[5] <- -conc.ineqs$int.h1.expx(ep.r,ql-conc.ineqs$c1,ql,a.r,b.r)
       }
-      if(lambda.signs=="neg"){
+      if(support=="neg.reals"){
         lower.components[2] <- conc.ineqs$int.h1.expx(-Inf,ep.l,ql,a.l,b.l)
         lower.components[4] <- conc.ineqs$int.h1.const(ep.r,ql-conc.ineqs$c1,ql) # This integrates out to ql instead of min(ql,0) because we need to account for the constant plateau of the NSD density above 0
         lower.components.4.alt <- conc.ineqs$int.h1.const(ep.r,ql-conc.ineqs$c1,ql, one.minus = TRUE)
@@ -190,13 +190,13 @@ QFGaussBounds <- function(cdf, f = "identity", max.abs.eta, sum.eta, sum.etasq, 
 
     if((ql-conc.ineqs$c1 > ep.l) & (ql-conc.ineqs$c1 <= ep.r)){
 
-      if(lambda.signs=="mixed"){
+      if(support=="all.reals"){
         lower.components[2] <- conc.ineqs$int.h1.expx(-Inf,ep.l,ql,a.l,b.l)
       }
-      if(lambda.signs=="pos"){
+      if(support=="pos.reals"){
         lower.components[2] <- conc.ineqs$int.h1.explogx(0,ep.l,ql,a.l,b.l)
       }
-      if(lambda.signs=="neg"){
+      if(support=="neg.reals"){
         lower.components[2] <- conc.ineqs$int.h1.expx(-Inf,ep.l,ql,a.l,b.l)
       }
 
@@ -206,13 +206,13 @@ QFGaussBounds <- function(cdf, f = "identity", max.abs.eta, sum.eta, sum.etasq, 
 
     if(ql-conc.ineqs$c1 <= ep.l){
 
-      if(lambda.signs=="mixed"){
+      if(support=="all.reals"){
         lower.components[2] <- conc.ineqs$int.h1.expx(-Inf,ql-conc.ineqs$c1,ql,a.l,b.l)
       }
-      if(lambda.signs=="pos"){
+      if(support=="pos.reals"){
         lower.components[2] <- conc.ineqs$int.h1.explogx(0,ql-conc.ineqs$c1,ql,a.l,b.l)
       }
-      if(lambda.signs=="neg"){
+      if(support=="neg.reals"){
         lower.components[2] <- conc.ineqs$int.h1.expx(-Inf,ql-conc.ineqs$c1,ql,a.l,b.l)
       }
 
@@ -299,7 +299,7 @@ TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.e
   Q.sd <- attr(fullcdf,"Q.sd")
 
   tf <- attr(fullcdf,"tail.features")
-  lambda.signs <- tf$lambda.signs
+  support <- tf$support
   ep.l <- tf$extrapolation.point.l
   ep.r <- tf$extrapolation.point.r
   a.l <- tf$a.l
@@ -308,20 +308,20 @@ TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.e
   b.r <- tf$b.r
 
 
-  if(lambda.signs == "mixed"){
+  if(support == "all.reals"){
     x.max <-uniroot(function(z) {- fullcdf(z,lower.tail = F,log.p = T) / log(10) - upper.tail.end},
                     lower = ep.r, upper = ep.r + 0.1*Q.sd,tol = .Machine$double.eps, extendInt = "upX")$root
     x.min <-uniroot(function(z) {- fullcdf(z,lower.tail = T,log.p = T) / log(10) - lower.tail.end},
                     lower = ep.l - 0.1*Q.sd, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
   }
 
-  if(lambda.signs == "pos"){
+  if(support == "pos.reals"){
     x.min <- 0
     x.max <-uniroot(function(z) {- fullcdf(z,lower.tail = F,log.p = T) / log(10) - upper.tail.end},
                     lower = ep.r, upper = ep.r + 0.1*Q.sd,tol = .Machine$double.eps, extendInt = "upX")$root
   }
 
-  if(lambda.signs == "neg"){
+  if(support == "neg.reals"){
     x.min <-uniroot(function(z) {- fullcdf(z,lower.tail = T,log.p = T) / log(10) - lower.tail.end},
                     lower = ep.l - 0.1*Q.sd, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
     x.max <- 0

@@ -127,7 +127,7 @@ QFGauss <- function(f.eta, delta = rep(0,length(f.eta)), sigma = 0, n = 2^16-1, 
       attr(cdf.func,"delta") <- delta
       attr(cdf.func,"mu") <- sum(f.eta*(1+delta^2))
       attr(cdf.func,"Q.sd") <- sum(2*(1+2*delta^2)*f.eta^2)
-      attr(cdf.func,"tail.features") <- list("lambda.signs" = ifelse(f.eta[1] > 0,"pos","neg"),
+      attr(cdf.func,"tail.features") <- list("support" = ifelse(f.eta[1] > 0,"pos.reals","neg.reals"),
                                              "extrapolation.point.l" = e.l,
                                              "extrapolation.point.r" = e.r,
                                              "a.l" = a.l,
@@ -150,7 +150,7 @@ QFGauss <- function(f.eta, delta = rep(0,length(f.eta)), sigma = 0, n = 2^16-1, 
   attr(cdf.func,"sigma") <- sigma
   attr(cdf.func,"mu") <- cdf$mu
   attr(cdf.func,"Q.sd") <- cdf$Q.sd
-  attr(cdf.func,"tail.features") <- list("lambda.signs" = cdf$type,
+  attr(cdf.func,"tail.features") <- list("support" = switch(cdf$type, mixed = "all.reals", pos = "pos.reals", neg = "neg.reals"),
                                          "extrapolation.point.l" = cdf$x[1],
                                          "extrapolation.point.r" = cdf$x[cdf$n],
                                          "a.l" = cdf$a.l,
@@ -183,7 +183,7 @@ plot.QFGaussCDF <- function(cdf,...){
   Q.sd <- attr(cdf,"Q.sd")
 
   tf <- attr(cdf,"tail.features")
-  lambda.signs <- tf$lambda.signs
+  support <- tf$support
   ep.l <- tf$extrapolation.point.l
   ep.r <- tf$extrapolation.point.r
   a.l <- tf$a.l
@@ -201,7 +201,7 @@ plot.QFGaussCDF <- function(cdf,...){
     ep.r <- C*qchisq(1e-16,length(f.eta),sum(delta^2),lower.tail = FALSE)
   }
 
-  if(lambda.signs == "mixed"){
+  if(support == "all.reals"){
     x.max <-uniroot(function(z) {- cdf(z,lower.tail = F,log.p = T) / log(10) - 20},
                     lower = ep.r, upper = ep.r + 0.1*Q.sd,tol = .Machine$double.eps, extendInt = "upX")$root
     x.min <-uniroot(function(z) {- cdf(z,lower.tail = T,log.p = T) / log(10) - 20},
@@ -209,13 +209,13 @@ plot.QFGaussCDF <- function(cdf,...){
     x <- seq(x.min,x.max,len=1e5)
   }
 
-  if(lambda.signs == "pos"){
+  if(support == "pos.reals"){
     x.max <-uniroot(function(z) {- cdf(z,lower.tail = F,log.p = T) / log(10) - 20},
                     lower = ep.r, upper = ep.r + 0.1*Q.sd,tol = .Machine$double.eps, extendInt = "upX")$root
     x <- seq(0,x.max,len=1e5)
   }
 
-  if(lambda.signs == "neg"){
+  if(support == "neg.reals"){
     x.min <-uniroot(function(z) {- cdf(z,lower.tail = T,log.p = T) / log(10) - 20},
                     lower = ep.l - 0.1*Q.sd, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
     x <- seq(x.min,0,len=1e3)
@@ -255,7 +255,7 @@ TestQFGauss <- function(cdf, n.samps = 1e4){
   Q.sd <- attr(cdf,"Q.sd")
 
   tf <- attr(cdf,"tail.features")
-  lambda.signs <- tf$lambda.signs
+  support <- tf$support
   ep.l <- tf$extrapolation.point.l
   ep.r <- tf$extrapolation.point.r
   a.l <- tf$a.l
@@ -274,7 +274,7 @@ TestQFGauss <- function(cdf, n.samps = 1e4){
     ep.r <- C*qchisq(1e-16,length(f.eta),sum(delta^2),lower.tail = FALSE)
   }
 
-  if(lambda.signs == "mixed"){
+  if(support == "all.reals"){
     x.max <-uniroot(function(z) {- cdf(z,lower.tail = F,log.p = T) / log(10) - 20},
                     lower = ep.r, upper = ep.r + 0.1*Q.sd,tol = .Machine$double.eps, extendInt = "upX")$root
     x.min <-uniroot(function(z) {- cdf(z,lower.tail = T,log.p = T) / log(10) - 20},
@@ -282,13 +282,13 @@ TestQFGauss <- function(cdf, n.samps = 1e4){
     x <- seq(x.min,x.max,len=1e5)
   }
 
-  if(lambda.signs == "pos"){
+  if(support == "pos.reals"){
     x.max <-uniroot(function(z) {- cdf(z,lower.tail = F,log.p = T) / log(10) - 20},
                     lower = ep.r, upper = ep.r + 0.1*Q.sd,tol = .Machine$double.eps, extendInt = "upX")$root
     x <- seq(0,x.max,len=1e5)
   }
 
-  if(lambda.signs == "neg"){
+  if(support == "neg.reals"){
     x.min <-uniroot(function(z) {- cdf(z,lower.tail = T,log.p = T) / log(10) - 20},
                     lower = ep.l - 0.1*Q.sd, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
     x <- seq(x.min,0,len=1e5)

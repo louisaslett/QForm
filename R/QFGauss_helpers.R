@@ -349,7 +349,7 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), sigma = 0, n = 2^16-1, 
     a.l.2 <- a.r
     b.l.2 <- -b.r
     a.r <- a.l
-    b.r <- ifelse(sigma==0,b.l,-b.l) # If sigma==0, then b.l was estimated in a pos.support framework.  If sigma!=0, b.l
+    if(sigma==0){ b.r <- b.l }else{ b.r <- -b.l }# If sigma==0, then b.l was estimated in a pos.support framework.  If sigma!=0, b.l
     # was estimated in a mixed support framework, which means to flip sides, we must also flip the sign.
     a.l <- a.l.2
     b.l <- b.l.2
