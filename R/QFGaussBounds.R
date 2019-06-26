@@ -368,6 +368,15 @@ TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.e
   attr(approxfullcdf,"Q.sd") <- attr(tcdf,"Q.sd")
 
 
+  VARr <- 2*sum.etasq + 4*sum.etasq.deltasq
+
+  gauss.tcdf <- QFGauss(f.eta[1:k],delta[1:k],sigma = sqrt(VARr), parallel.sapply = parallel.sapply)
+
+  gauss.approxfullcdf <- function(x, density = FALSE, lower.tail = TRUE, log.p = FALSE) gauss.tcdf(x-Er, density = density, lower.tail = lower.tail, log.p = log.p)
+  attr(gauss.approxfullcdf,"mu") <- attr(gauss.tcdf,"mu") + Er
+  attr(gauss.approxfullcdf,"Q.sd") <- attr(gauss.tcdf,"Q.sd")
+
+
   old.par <- par(no.readonly = T)
   par(mfrow=c(2,2))
 
@@ -378,6 +387,8 @@ TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.e
   points(xx,raw.bounds[,1],col="blue",pch=4)
   points(xx,raw.bounds[,2],col="red",pch=4)
   lines(x,approxfullcdf(x),type="l",col="darkorange",lwd=1.5)
+  lines(x,gauss.approxfullcdf(x),type="l",col="green",lwd=1.5)
+
 
 
   true.pval.uppertail <- fullcdf(suppressWarnings(uniroot(function(z) {- approxfullcdf(z,lower.tail = F,log.p = T) / log(10) - 8},
@@ -395,22 +406,34 @@ TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.e
   xx.uppertail <- -approxfullcdf(x,lower.tail = F, log.p = T)/log(10)
   xx.lowertail <- -approxfullcdf(x, log.p = T)/log(10)
 
+  gauss.yy.uppertail <- -fullcdf(x,lower.tail = F, log.p = T)/log(10) + gauss.approxfullcdf(x,lower.tail = F, log.p = T)/log(10)
+  gauss.yy.lowertail <- -fullcdf(x, log.p = T)/log(10) + gauss.approxfullcdf(x, log.p = T)/log(10)
+  gauss.xx.uppertail <- -gauss.approxfullcdf(x,lower.tail = F, log.p = T)/log(10)
+  gauss.xx.lowertail <- -gauss.approxfullcdf(x, log.p = T)/log(10)
+
   plot(xx.uppertail,
        yy.uppertail,
-       type = "l", lwd = 1.5, ylab = "Trunc. Approx. - True -log10 p-values",
-       xlab = "Trunc. Approx. -log10 p-value",
+       type = "l", lwd = 1.5, ylab = "Approx. - True -log10 p-values",
+       xlab = "Approx. -log10 p-value",
        ylim = range(pretty(c(yy.uppertail,yy.lowertail))),
        xlim = range(pretty(c(xx.uppertail,xx.lowertail))),
        main = paste("At Naive p = 1e-8, upper tail p =",
                     signif(true.pval.uppertail,digits=3),", lower tail p =",signif(true.pval.lowertail,digits=3)),
-       font.main = 1
+       font.main = 1, col="darkorange"
        )
 
   lines(xx.lowertail,
         yy.lowertail,
-        type = "l", lwd = 1.5,lty=3)
-  abline(h=0,lty=4)
+        type = "l", lwd = 1.5,lty=3, col="darkorange")
 
+  lines(gauss.xx.uppertail,
+        gauss.yy.uppertail,
+        type = "l", lwd = 1.5, col="green")
+
+  lines(gauss.xx.lowertail,
+        gauss.yy.lowertail,
+        type = "l", lwd = 1.5,lty=3, col="green")
+  abline(h=0,lty=4)
 
   plot(x,-fullcdf(x,log.p = T)/log(10),type="l",lwd=1.5,
        ylab = expression(-log[10](CDF)),main=expression(-log[10](CDF)), xlab=expression(Q[f]))# CDF as calculated by QForm
@@ -419,6 +442,7 @@ TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.e
   points(xx,-log10(raw.bounds[,1]),col="blue",pch=4)
   points(xx,-log10(raw.bounds[,2]),col="red",pch=4)
   lines(x,-approxfullcdf(x,log.p = T)/log(10),type="l",col="darkorange",lwd=1.5)
+  lines(x,-gauss.approxfullcdf(x,log.p = T)/log(10),type="l",col="green",lwd=1.5)
 
 
   plot(x,-fullcdf(x,lower.tail = F,log.p = T)/log(10),type="l",lwd=1.5,
@@ -428,6 +452,8 @@ TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.e
   points(xx,-log10(raw.bounds[,3]),col="blue",pch=4)
   points(xx,-log10(raw.bounds[,4]),col="red",pch=4)
   lines(x,-approxfullcdf(x,lower.tail = F,log.p = T)/log(10),type="l",col="darkorange",lwd=1.5)
+  lines(x,-gauss.approxfullcdf(x,lower.tail = F,log.p = T)/log(10),type="l",col="green",lwd=1.5)
+
 
   par(old.par)
 }

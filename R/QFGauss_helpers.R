@@ -136,6 +136,20 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), sigma = 0, n = 2^16-1, 
                                        Proceeding to result but consider using pchisq instead.")}
 
 
+  all.pos <- all(evals>=0)
+
+  all.neg <- all(evals<=0)
+
+  pos.support <- all.pos & sigma==0
+  neg.support <- all.neg & sigma==0
+
+  if(pos.support){type <- "pos"}
+  if(neg.support){type <- "neg"}
+
+  # If all of the eigenvalues are negative, flip them around to make them all positive and flip them back over later.
+  if(all.neg){evals <- - evals}
+
+
   # Determine Rescaling and Centering for Numerical Stability
   # We center the distribution but standardize by the component with the largest variance, not the total variance
   #########################
@@ -154,42 +168,40 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), sigma = 0, n = 2^16-1, 
   # Determine on how fine a grid we need to FFT (will determine the interval on which we estimate the density)
   ####################################
 
-  # TO FIX CURRENTLY not handling the neg.semi.def case properly because I still need to be able to flip evals.s around even when sigma!=0
-  # Think I need separate control of (pos vs neg vs all support) and (pos def, neg def -- eg: do we need to flip the sign)
-
-  pos.semi.def <- all(evals.s>=0) & sigma==0
-  neg.semi.def <- all(evals.s<=0) & sigma==0
-
-  flip.sign <- all(evals.s<=0)
-
-  if(pos.semi.def){type <- "pos"}
-  if(neg.semi.def){type <- "neg"}
-
-
-  # If neg.semi.definite, flip all eigenvalues to make it a PSD problem (flip back later)
-  if(flip.sign){evals.s <- - evals.s}
-
-  b.standardized <- uniroot(function(z,nu,resid.op.norm.bd,bound) {
+  fft.conc.ineq <- function(z,nu,resid.op.norm.bd,bound) {
     # This is our concentration inequality
     ifelse(z <= nu / (4*resid.op.norm.bd),
            0.5*(z^2) / nu,
            z / (4*resid.op.norm.bd) - 0.5*nu / ((4*resid.op.norm.bd)^2) ) / log(10) - bound
-  }, lower = 0, upper = 1e3*(Q.sd/s),tol = .Machine$double.eps,
-  nu = 8*sum(ncps*(evals.s^2))+4*sum(evals.s^2)+sigma^2, resid.op.norm.bd = max(evals.s), bound = 17,
-  extendInt = "upX")$root
-
-  if(pos.semi.def | neg.semi.def){
-    a.standardized <- -mu.s  ## TO FIX
-  }else{
-    a.standardized <- -uniroot(function(z,nu,resid.op.norm.bd,bound) {
-      # This function is negative log of H
-      ifelse(z <= nu / (4*resid.op.norm.bd),
-             0.5*(z^2) / nu,
-             z / (4*resid.op.norm.bd) - 0.5*nu / ((4*resid.op.norm.bd)^2) ) / log(10) - bound
-    }, lower = 0, upper = 1e3*(Q.sd/s),tol = .Machine$double.eps,
-    nu = 8*sum(ncps*(evals.s^2))+4*sum(evals.s^2)+sigma^2, resid.op.norm.bd = abs(min(evals.s)), bound = 17,
-    extendInt = "upX")$root
   }
+
+  nu <- 8*sum(ncps*(evals.s^2))+4*sum(evals.s^2)+sigma.s^2
+
+
+  b.standardized <- uniroot(fft.conc.ineq, lower = 0, upper = 1e3*(Q.sd/s),tol = .Machine$double.eps,
+                            nu = nu, resid.op.norm.bd = max(evals.s), bound = 17,
+                            extendInt = "upX")$root
+
+
+  if(pos.support | neg.support){
+
+    a.standardized <- -mu.s
+
+  }else{
+
+    if( (all.pos | all.neg) & sigma!=0){
+
+      a.standardized  <- qnorm(1e-17,0,sigma.s) # Only the Gaussian component opposes the chi square terms
+
+    }else{
+
+      # These are cases where either there are simply evals of mixed signs (with or without sigma)
+      a.standardized <- -uniroot(fft.conc.ineq, lower = 0, upper = 1e3*(Q.sd/s),tol = .Machine$double.eps,
+                                 nu = nu, resid.op.norm.bd = abs(min(evals.s)), bound = 17,
+                                 extendInt = "upX")$root
+    }
+  }
+
 
   # Evaluate CDF using FFT
   ######################
@@ -235,7 +247,7 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), sigma = 0, n = 2^16-1, 
 
   best.r <- ifelse(length(r0)==0, n, ctstart.r-2+min(r0)) # One point in from the trouble point
 
-  if(pos.semi.def | neg.semi.def){ # All eigenvalues are zero or positive and sigma == 0
+  if(pos.support | neg.support){ # All eigenvalues are zero or positive and sigma == 0
     fft_cdf[1] <- 0
     l0 <- which(fft_cdf[2:ctstart.l] <= 0)+1
   }else{
@@ -261,7 +273,7 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), sigma = 0, n = 2^16-1, 
 
   # Finally: refine extrapolation points by cropping off the density when it starts becoming curvy due to numerical instability
 
-  if(pos.semi.def | neg.semi.def){
+  if(pos.support | neg.support){
     limit.l <- 0
     limit.r <- Inf
     right.tail<-extrapolate_tail(log.cdf.r,xx.standardized,ctstart.r,best.r,num.windows=20,right.side=TRUE)
@@ -292,7 +304,7 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), sigma = 0, n = 2^16-1, 
   }
 
   # If we have both positive and negative eigenvalues or sigma !=0
-  if(!(pos.semi.def | neg.semi.def)){
+  if(!(pos.support | neg.support)){
 
     type <-"mixed"
     limit.r <- Inf
@@ -327,16 +339,18 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), sigma = 0, n = 2^16-1, 
   xx = xx[best.l:best.r]
   fft_cdf = fft_cdf[best.l:best.r]
 
-  # Flip around if neg.semi.def
-  if(flip.sign){
+  # Flip around if neg.support
+  if(all.neg){
+    mu <- -mu
     xx <- -rev(xx)
     fft_cdf <- 1-rev(fft_cdf)
-    limit.r <- 0
+    limit.r <- ifelse(sigma==0,0,Inf)
     limit.l <- -Inf
     a.l.2 <- a.r
     b.l.2 <- -b.r
     a.r <- a.l
-    b.r <- b.l
+    b.r <- ifelse(sigma==0,b.l,-b.l) # If sigma==0, then b.l was estimated in a pos.support framework.  If sigma!=0, b.l
+    # was estimated in a mixed support framework, which means to flip sides, we must also flip the sign.
     a.l <- a.l.2
     b.l <- b.l.2
     # best.l <- n - best.l + 1
