@@ -5,13 +5,13 @@
 #' \deqn{R_f = \sum\limits_{i \in \mathcal{R}} f\left(\eta_i \right) \left(Z_i + \delta_i)^2,}{R_f = \Sigma_{i \in R} f (\eta_i) (Z_i + \delta_i)^2,} where \eqn{Z_i \sim N(0,1)}{Z_i ~ N(0,1)}, and only the CDF of \eqn{T_f} is known.
 #'
 #' In the genomics literature, SKAT and related methods have limiting distributions of this form.  In the machine learning and kernel methods literature, other popular test statistics share this limiting distribution, among them the Hilbert-Schimidt Information Criterion (HSIC).
-#' Approximate methods have emerged in the genomics (eg: FastSKAT) and kernel methods literature, have emerged based on the idea of using a top-k SVD to obtain \eqn{T_f} and then attempt to approximate the contribution from \eqn{R_f} using it's expectation (or an approximation thereof).
-#' However, we've found that in several applications, plugging in the expectation of \eqn{R_f} can lead to p-value estimates that are off by orders of magnitude.  We take a concentration-inequality based approach to bounding the potential contribution of \eqn{R_f}
+#' Approximate methods have emerged in the genomics (eg: FastSKAT) and kernel methods literature, have emerged based on the idea of using a top-k SVD to obtain \eqn{T_f} and then attempt to approximate the contribution from \eqn{R_f} using a single random variable that matches some of the moments of \eqn{R_f}.
+#' However, we've found that in several applications, such approximations of \eqn{R_f} can lead to p-value estimates that are off by orders of magnitude.  We take a concentration-inequality based approach to bounding the potential contribution of \eqn{R_f}
 #' to the overall distribution of \eqn{Q_f}, allowing us to obtain exact upper and lower bounds on the p-value that can allow users to quickly discard observations (eg: genomic loci) that could never be significant while concentrating further computational resources
 #' on more precisely evaluating the p-value at loci that could still potentially be interesting/significant.
 #'
 #' Our implementation features two main new functions.  First, we do not rely on \code{CompQuadForm}, which implements Davie's method but as such has difficult-to-tune parameters and can often fail for pvalues smaller than 1e-16.
-#' Davie's method is based on a more general identity relating the CDF to the inverse Fourier transform of a random variable, but predates the fast fourier transform.  We make use of the same identity as Davies, but by combining it with the FFT, obtain the CDF of random variables of the form of \eqn{Q_f}
+#' Davie's method is based on a more general integral transform that relates the CDF of a random variable to its characteristic function, but predates the fast fourier transform.  We make use of the same identity as Davies, but by combining it with the FFT, obtain the CDF of random variables of the form of \eqn{Q_f}
 #' at many points in parallel (implemented in \code{\link{QFGauss}}).
 #'
 #' Given the CDF produced by \code{\link{QFGauss}}, we apply a set of analytic and numerical intergration routines to \eqn{T_f} to calculate our p-value bounds for \eqn{Q_f} (implemented in \code{\link{QFGaussBounds}}).
