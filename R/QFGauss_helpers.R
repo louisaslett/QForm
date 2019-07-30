@@ -66,13 +66,22 @@ extrapolate_tail<-function(log.cdf,xx.standardized,start,best,num.windows,right.
   interval.length<-ifelse(right.side,floor(2*(min(best,which.max(log.cdf>-log(1e-5)))-start)/(num.windows+3)),
                           -floor(2*(max(best,which.max(-log.cdf>log(1e-5)))-1-start)/(num.windows+3)))
 
-  if(interval.length<10){warning(paste("Too few evaluation points in the",
-                                       ifelse(right.side,"right","left"),"tail to make reliable extrapolation: result returned.
-                                       Try increasing the number of CDF domain grid points n (optional argument)",sep=" "))}
+  if(interval.length<10){
+    warning(paste(ifelse(right.side,"Right","Left"),"Tail Extrapolation Unstable: the",
+                  ifelse(right.side,"right","left"),
+                  "tail decays too rapidly for",
+                  ifelse(right.side,"a.r and b.r","a.l and b.l"),
+                  "to be reliably estimated with the given number of FFT grid points (set by QFGauss optional argument n). ",
+                  "Consider increasing n."))
+    }
 
   if(interval.length<4){
-    warning(paste("Too few evaluation points in the", ifelse(right.side,"right","left"),"tail to extrapolate: NAs returned for extrapolation.
-                  Try increasing the number of CDF domain grid points n (optional argument)",sep=" "))
+    warning(paste(ifelse(right.side,"Right","Left"),"Tail Extrapolation Failed: the",
+                  ifelse(right.side,"right","left"),
+                  "tail decays too rapidly for",
+                  ifelse(right.side,"a.r and b.r","a.l and b.l"),
+                  "to be estimated with the given number of FFT grid points (set by QFGauss optional argument n). ",
+                  "Consider increasing n."))
     return(list("b" = NA,"best" = NA,"successful"=F))
   }
 
@@ -516,3 +525,75 @@ wrap.QFcdf <- function(cdf){
          neg = function(x, density = FALSE, lower.tail = TRUE, log.p = FALSE) eval.cdf.neg(x, cdf, density = density, lower.tail = lower.tail, log.p = log.p)
   )
 }
+
+calc.plotting.grid <- function(cdf, sample.range = NULL){
+  # Returns a vector x encoding a grid of points at which it is reasonable to evaluate cdf for plotting and testing purposes
+
+  fft_used <- attr(cdf,"fft_used")
+  f.eta <- attr(cdf,"f.eta")
+  delta <- attr(cdf,"delta")
+  mu <- attr(cdf,"mu")
+  Q.sd <- attr(cdf,"Q.sd")
+
+  tf <- attr(cdf,"tail.features")
+  support <- tf$support
+  ep.l <- tf$extrapolation.point.l
+  ep.r <- tf$extrapolation.point.r
+  a.l <- tf$a.l
+  b.l <- tf$b.l
+  a.r <- tf$a.r
+  b.r <- tf$b.r
+
+  if(!fft_used){
+    df <- length(f.eta)
+    C <- abs(f.eta[1])
+    ep.l <- C*qchisq(1e-16,length(f.eta),sum(delta^2))
+    ep.r <- C*qchisq(1e-16,length(f.eta),sum(delta^2),lower.tail = FALSE)
+  }
+
+
+  if(support == "all.reals"){
+    if(any(is.na(c(a.r,b.r)))){
+      x.max <- max(ep.r,sample.range[2])
+    }else{
+      x.max <-uniroot(function(z) {- cdf(z,lower.tail = F,log.p = T) / log(10) - 20},
+                      lower = ep.r, upper = ep.r + 0.1*Q.sd,tol = .Machine$double.eps, extendInt = "upX")$root
+    }
+
+    if(any(is.na(c(a.l,b.l)))){
+      x.min <- min(ep.l,sample.range[1])
+    }else{
+      x.min <-uniroot(function(z) {- cdf(z,lower.tail = T,log.p = T) / log(10) - 20},
+                      lower = ep.l - 0.1*Q.sd, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
+    }
+
+    x <- seq(x.min,x.max,len=1e5)
+  }
+
+  if(support == "pos.reals"){
+    if(any(is.na(c(a.r,b.r)))){
+      x.max <- max(ep.r,sample.range[2])
+    }else{
+      x.max <-uniroot(function(z) {- cdf(z,lower.tail = F,log.p = T) / log(10) - 20},
+                      lower = ep.r, upper = ep.r + 0.1*Q.sd,tol = .Machine$double.eps, extendInt = "upX")$root
+    }
+
+    x <- seq(0,x.max,len=1e5)
+  }
+
+  if(support == "neg.reals"){
+    if(any(is.na(c(a.l,b.l)))){
+      x.min <- min(ep.l,sample.range[1])
+    }else{
+      x.min <-uniroot(function(z) {- cdf(z,lower.tail = T,log.p = T) / log(10) - 20},
+                      lower = ep.l - 0.1*Q.sd, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
+    }
+
+    x <- seq(x.min,0,len=1e5)
+  }
+
+  x
+}
+
+
+

@@ -12,7 +12,8 @@
 #'
 #' Since \code{stats::fft} can only evaluate the CDF up to double precision, we extrapolate the tails of \eqn{T_f}.  QForm automatically detects the region where the estimated CDF begins to lose precision.  A log-linear function is used for tails that go out to infinity and a function of the form \eqn{\alpha |x|^\beta} is used for tails truncated at 0 (when all of the \code{f.eta} have the same sign).  These extrapolated tails, motivated by the form of the characteristic function, provide accurate approximations in most cases when compared against a quad-precision implementation (not yet included in \code{QForm}).
 #'
-#' Our current tail extrapolation scheme can struggle in cases where the target distribution is extremely skewed, since that leaves fewer points from the FFT with which to perform extrapolation on one of the tails.  We plan to address this in future versions by deploying a second FFT when needed.
+#' Our current tail extrapolation scheme can become unstable or fail in cases where the target distribution is extremely skewed.  In these cases, one of the tails decays too rapidly to be estimated with the given number of FFT grid points (set by QFGauss optional argument n).  \code{QFGaussBounds} cannot currently calculate bounds for a cdf returned by \code{QFGauss} that has a missing tail.  While we plan to address extremely skewed cases in future versions by deploying a second FFT when needed, for now, we recommend that users who really care about estimation of the thin tail
+#' or obtaining bounds with \code{QFGaussBounds} to try increasing the number of FFT grid points, \code{n}, passed to \code{QFGauss}.
 #'
 #' A note on unbounded densities: The density of \eqn{T_f} is guaranteed to be bounded if length(f.eta) > 2 and there is no trouble in density estimation posed by asymptotes.  In the length(f.eta)==2 case, if the two components of f.eta are of opposite signs, then the density of \eqn{T_f}{T_f} may have an asymptote at some value \eqn{t}{t}.  While the density in the neighborhood around that \eqn{t} should be accurately calculated, due to the FFT and spline interpolation approach used, the density reported at \eqn{t}{t} may be reported as some finite rather than as Inf.  In the length(f.eta)==1 case, QFGauss resorts to dchisq and the density at 0 is accurately reported as Inf.
 #'
@@ -176,50 +177,9 @@ QFGauss <- function(f.eta, delta = rep(0,length(f.eta)), sigma = 0, n = 2^16-1, 
 plot.QFGaussCDF <- function(cdf,...){
   if(class(cdf)[1]!="QFGaussCDF"){stop("cdf must be of class QFGaussCDF")}
 
-  fft_used <- attr(cdf,"fft_used")
-  f.eta <- attr(cdf,"f.eta")
-  delta <- attr(cdf,"delta")
-  mu <- attr(cdf,"mu")
-  Q.sd <- attr(cdf,"Q.sd")
+  if(any(sapply(attr(cdf,"tail.features"),is.na))){warning("plotting domain truncated because at least one tail is missing: tail extrapolation in QFGauss failed, see ?QFGauss for details.")}
 
-  tf <- attr(cdf,"tail.features")
-  support <- tf$support
-  ep.l <- tf$extrapolation.point.l
-  ep.r <- tf$extrapolation.point.r
-  a.l <- tf$a.l
-  b.l <- tf$b.l
-  a.r <- tf$a.r
-  b.r <- tf$b.r
-
-
-  if(any(is.na(c(a.l,b.l,a.r,b.r)))){stop("test cannot be run because tail extrapolation in QFGauss failed for at least one tail, resulting in NA value for a.l, b.l, a.r, or a.r")}
-
-  if(!fft_used){
-    df <- length(f.eta)
-    C <- abs(f.eta[1])
-    ep.l <- C*qchisq(1e-16,length(f.eta),sum(delta^2))
-    ep.r <- C*qchisq(1e-16,length(f.eta),sum(delta^2),lower.tail = FALSE)
-  }
-
-  if(support == "all.reals"){
-    x.max <-uniroot(function(z) {- cdf(z,lower.tail = F,log.p = T) / log(10) - 20},
-                    lower = ep.r, upper = ep.r + 0.1*Q.sd,tol = .Machine$double.eps, extendInt = "upX")$root
-    x.min <-uniroot(function(z) {- cdf(z,lower.tail = T,log.p = T) / log(10) - 20},
-                    lower = ep.l - 0.1*Q.sd, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
-    x <- seq(x.min,x.max,len=1e5)
-  }
-
-  if(support == "pos.reals"){
-    x.max <-uniroot(function(z) {- cdf(z,lower.tail = F,log.p = T) / log(10) - 20},
-                    lower = ep.r, upper = ep.r + 0.1*Q.sd,tol = .Machine$double.eps, extendInt = "upX")$root
-    x <- seq(0,x.max,len=1e5)
-  }
-
-  if(support == "neg.reals"){
-    x.min <-uniroot(function(z) {- cdf(z,lower.tail = T,log.p = T) / log(10) - 20},
-                    lower = ep.l - 0.1*Q.sd, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
-    x <- seq(x.min,0,len=1e3)
-  }
+  x <- calc.plotting.grid(cdf)
 
   old.par <- par(no.readonly = T)
   plot(x, cdf(x), type = "l", lwd=1.5, ylab = expression(CDF),xlab=expression(T[f])) # plot lower tail of CDF
@@ -233,6 +193,7 @@ plot.QFGaussCDF <- function(cdf,...){
 #'
 #' Four plots are produced.  The top-left plot overlays the CDF computed by QFGauss (in black) and the empirical CDF (in red) based on 10,000 samples.
 #' The top-right plot shows the distance between the empirical and QFGauss-computed CDF and the corresponding ks.test p-value (two-sided alternative).
+#' The ks.test p-value will be \code{NA} if \code{cdf} is missing one of its tails (see \code{\link{QFGauss}} for details).
 #' The two bottom plots allow comparison of the empirical CDF (in red) with the computed CDF (in black) in each tail.
 #'
 #' @param cdf a QFGaussCDF
@@ -247,63 +208,36 @@ TestQFGauss <- function(cdf, n.samps = 1e4){
 
   if(class(cdf)[1]!="QFGaussCDF"){stop("cdf must be of class QFGaussCDF")}
 
-  fft_used <- attr(cdf,"fft_used")
+  missing.tail <- FALSE
+
+  if(any(is.na(c(attr(cdf,"tail.features")$a.r, attr(cdf,"tail.features")$b.r)))){
+    missing.tail <- TRUE
+    warning("testing domain truncated because cdf is missing its right tail: tail extrapolation in QFGauss failed, see ?QFGauss for details.")
+  }
+
+  if(any(is.na(c(attr(cdf,"tail.features")$a.l, attr(cdf,"tail.features")$b.l)))){
+    missing.tail <- TRUE
+    warning("testing domain truncated because cdf is missing its left tail: tail extrapolation in QFGauss failed, see ?QFGauss for details.")
+  }
+
   f.eta <- attr(cdf,"f.eta")
   delta <- attr(cdf,"delta")
   sigma <- attr(cdf,"sigma")
-  mu <- attr(cdf,"mu")
-  Q.sd <- attr(cdf,"Q.sd")
-
-  tf <- attr(cdf,"tail.features")
-  support <- tf$support
-  ep.l <- tf$extrapolation.point.l
-  ep.r <- tf$extrapolation.point.r
-  a.l <- tf$a.l
-  b.l <- tf$b.l
-  a.r <- tf$a.r
-  b.r <- tf$b.r
-
-
-  if(any(is.na(c(a.l,b.l,a.r,b.r)))){stop("test cannot be run because tail extrapolation in QFGauss failed for at least one tail, resulting in NA value for a.l, b.l, a.r, or a.r")}
-
-
-  if(!fft_used){
-    df <- length(f.eta)
-    C <- abs(f.eta[1])
-    ep.l <- C*qchisq(1e-16,length(f.eta),sum(delta^2))
-    ep.r <- C*qchisq(1e-16,length(f.eta),sum(delta^2),lower.tail = FALSE)
-  }
-
-  if(support == "all.reals"){
-    x.max <-uniroot(function(z) {- cdf(z,lower.tail = F,log.p = T) / log(10) - 20},
-                    lower = ep.r, upper = ep.r + 0.1*Q.sd,tol = .Machine$double.eps, extendInt = "upX")$root
-    x.min <-uniroot(function(z) {- cdf(z,lower.tail = T,log.p = T) / log(10) - 20},
-                    lower = ep.l - 0.1*Q.sd, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
-    x <- seq(x.min,x.max,len=1e5)
-  }
-
-  if(support == "pos.reals"){
-    x.max <-uniroot(function(z) {- cdf(z,lower.tail = F,log.p = T) / log(10) - 20},
-                    lower = ep.r, upper = ep.r + 0.1*Q.sd,tol = .Machine$double.eps, extendInt = "upX")$root
-    x <- seq(0,x.max,len=1e5)
-  }
-
-  if(support == "neg.reals"){
-    x.min <-uniroot(function(z) {- cdf(z,lower.tail = T,log.p = T) / log(10) - 20},
-                    lower = ep.l - 0.1*Q.sd, upper = ep.l,tol = .Machine$double.eps, extendInt = "downX")$root
-    x <- seq(x.min,0,len=1e5)
-  }
 
   old.par <- par(no.readonly = T)
   par(mfrow=c(2,2))
   samps <- c(colSums(f.eta * (matrix(rnorm(n.samps * length(f.eta)), nrow = length(f.eta)) + delta)^2)) + rnorm(n.samps,sd = sigma)
   qecdf <- ecdf(samps)
 
+  x <- calc.plotting.grid(cdf,range(samps))
+
   plot(x, cdf(x), type = "l", lwd=1.5, ylab = expression(CDF),xlab=expression(T[f]), main=expression(CDF~of~T[f])) # plot lower tail of CDF
   lines(x, qecdf(x), lwd=1,col="red") # plot lower tail of CDF
   #legend("topleft",legend=c("QForm CDF","ECDF"),col=c("black","blue"),lty=c(1,3))
 
-  plot(x,cdf(x)-qecdf(x), type="l",ylab = expression(CDF - ECDF), xlab=expression(T[f]), main=paste("Comparison to ECDF: ks.test p-value =",signif(ks.test(samps,cdf)$p.value,2)),lwd=1.5,font.main=1)
+  if(missing.tail){ ks.pvalue <- NA }else{ ks.pvalue <- signif(ks.test(samps,cdf)$p.value,2) }
+
+  plot(x,cdf(x)-qecdf(x), type="l",ylab = expression(CDF - ECDF), xlab=expression(T[f]), main=paste("Comparison to ECDF: ks.test p-value =", ks.pvalue),lwd=1.5,font.main=1)
   abline(h=0)
 
   plot(x, -cdf(x, log.p = TRUE)/log(10), type = "l",

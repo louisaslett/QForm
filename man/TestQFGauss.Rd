@@ -20,6 +20,7 @@ Compares the CDF inferred by QFGauss to an empirical CDF.
 \details{
 Four plots are produced.  The top-left plot overlays the CDF computed by QFGauss (in black) and the empirical CDF (in red) based on 10,000 samples.
 The top-right plot shows the distance between the empirical and QFGauss-computed CDF and the corresponding ks.test p-value (two-sided alternative).
+The ks.test p-value will be \code{NA} if \code{cdf} is missing one of its tails (see \code{\link{QFGauss}} for details).
 The two bottom plots allow comparison of the empirical CDF (in red) with the computed CDF (in black) in each tail.
 }
 \examples{

@@ -36,6 +36,8 @@ The returned bounds function takes a vector of observed values \code{q} at which
 The returned bounds function itself returns a dataframe with four columns: \code{c("lower.bound","upper.bound","one.minus.lower.bound","one.minus.upper.bound")}.  The first and second columns are lower and upper bounds on the CDF at \code{q} respectively; the third and fourth columns are equal to one minus the first two columns but calculated separately by the function internally in order to maintain numerical precision in the upper tail.  Thus, it is strongly recommneded that users interested in upper tail p-values use the third and fourth columns rather than the first and second.
 
 The returned bounds function can also take a parallel version of sapply from a given R parallelization package via the optional argument \code{parallel.sapply}.  This can substantially speed up computation for long \code{q}.  See Example below and \code{\link{QFGauss}} for more details.
+
+\code{QFGaussBounds} cannot currently calculate bounds for a cdf returned by \code{QFGauss} that has a missing tail.  See \code{\link{QFGauss}} for more details.
 }
 \examples{
 
