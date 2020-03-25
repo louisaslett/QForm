@@ -6,7 +6,7 @@
 #' Currently only \eqn{f = "identity"} is supported, but future versions will allow one to select \eqn{f} from a list or specify their own function with its corresponding bounds through a QFormFunction object.
 #'
 #' The returned bounds function takes a vector of observed values \code{q} at which to calculate bounds as it's main argument. If \code{q} is not known exactly, but only a lower bound \code{ql} and an upper bound \code{qu} are known, then those may provided instead of \code{q} and the returned bounds on the CDF will be valid for a \code{q} in \code{[ql,qu]}.  If \code{q} is provided, \code{ql} and \code{qu} are ignored.
-#' The returned bounds function itself returns a dataframe with four columns: \code{c("lower.bound","upper.bound","one.minus.lower.bound","one.minus.upper.bound")}.  The first and second columns are lower and upper bounds on the CDF at \code{q} respectively; the third and fourth columns are equal to one minus the first two columns but calculated separately by the function internally in order to maintain numerical precision in the upper tail.  Thus, it is strongly recommneded that users interested in upper tail p-values use the third and fourth columns rather than the first and second.
+#' The returned bounds function itself returns a matrix with four columns: \code{c("lower.bound","upper.bound","one.minus.lower.bound","one.minus.upper.bound")}.  The first and second columns are lower and upper bounds on the CDF at \code{q} respectively; the third and fourth columns are equal to one minus the first two columns but calculated separately by the function internally in order to maintain numerical precision in the upper tail.  Thus, it is strongly recommneded that users interested in upper tail p-values use the third and fourth columns rather than the first and second.
 #'
 #' The returned bounds function can also take a parallel version of sapply from a given R parallelization package via the optional argument \code{parallel.sapply}.  This can substantially speed up computation for long \code{q}.  See Example below and \code{\link{QFGauss}} for more details.
 #'
@@ -79,7 +79,10 @@ QFGaussBounds <- function(cdf, f = "identity", max.abs.eta, sum.eta, sum.etasq, 
   # Create set of integration functions needed for integrating over the extrapolated tails of cdf corresponding to
   # the concentration bound for f
   if(f == "identity"){
-    conc.ineqs <- QForm:::WrapConcIneq.identity(sum.eta.deltasq + sum.eta, sum.eta.deltasq + sum.eta, 8*sum.etasq.deltasq + 4*sum.etasq, 1/(4*max.abs.eta))
+    conc.ineqs <- QForm:::WrapConcIneq.identity(sum.eta.deltasq + sum.eta,
+                                                sum.eta.deltasq + sum.eta,
+                                                8*(sum.etasq.deltasq + (log(4)-1)*sum.etasq),
+                                                1/(4*max.abs.eta))
   }else{
     stop("For now, identity is the only valid option for f")
   }
@@ -254,12 +257,12 @@ QFGaussBounds <- function(cdf, f = "identity", max.abs.eta, sum.eta, sum.etasq, 
     # If q is specified, it over-rides qu and ql.
     if(!is.null(q)){
       if(!is.numeric(q)){stop("q must be numeric")}
-      return(as.data.frame(t(parallel.sapply(split(cbind(q,q),1:length(q)),bound.func))))
+      return(t(parallel.sapply(split(cbind(q,q),1:length(q)),bound.func)))
     }else{
       if( !(is.numeric(ql) & is.numeric(qu))  ){stop("ql and qu must be numeric")}
       if(length(ql)!=length(qu)){stop("ql and qu must have the same length")}
       if(any(qu<ql)){stop("ql must be less than or equal to qu")}
-      return(as.data.frame(t(parallel.sapply(split(cbind(ql,qu),1:length(ql)),bound.func))))
+      return(t(parallel.sapply(split(cbind(ql,qu),1:length(ql)),bound.func)))
     }
   }
 
