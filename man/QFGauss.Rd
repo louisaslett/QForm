@@ -4,8 +4,13 @@
 \alias{QFGauss}
 \title{Fast CDF/PDF of a Quadratic Form in Gaussians}
 \usage{
-QFGauss(f.eta, delta = rep(0, length(f.eta)), sigma = 0, n = 2^16 -
-  1, parallel.sapply = base::sapply)
+QFGauss(
+  f.eta,
+  delta = rep(0, length(f.eta)),
+  sigma = 0,
+  n = 2^16 - 1,
+  parallel.sapply = base::sapply
+)
 }
 \arguments{
 \item{f.eta}{vector; real-valued coefficients, \eqn{f(\eta_i)}, (may be positive or negative)}

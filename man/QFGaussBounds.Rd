@@ -4,8 +4,16 @@
 \alias{QFGaussBounds}
 \title{Bounds on the CDF of a Quadratic Form in Gaussians}
 \usage{
-QFGaussBounds(cdf, f = "identity", max.abs.eta, sum.eta, sum.etasq,
-  sum.eta.deltasq = 0, sum.etasq.deltasq = 0)
+QFGaussBounds(
+  cdf,
+  f = "identity",
+  max.abs.eta,
+  sum.eta,
+  sum.etasq,
+  sum.eta.deltasq = 0,
+  sum.etasq.deltasq = 0,
+  include.saddlepoint = FALSE
+)
 }
 \arguments{
 \item{cdf}{function; the cdf of \eqn{T_f} returned by \code{QForm::QForm}}
@@ -57,8 +65,8 @@ system.time(y <- bounds(xx))
 
 x <- seq(-1e3, 1e3, len = 1e3)
 plot(x, cdf(x), type = "l", ylab = expression(CDF),xlab=expression(T[f]), main=expression(Bounds~on~CDF~of~T[f])) # CDF
-points(xx, y$lower.bound, col = "blue")
-points(xx, y$upper.bound, col = "red")
+points(xx, y[,1], col = "blue")
+points(xx, y[,2], col = "red")
 
 # Generate diagnostic plots for bounds
 TestQFGaussBounds(QFGauss(c(1,5,-4,-3,10),c(2,-1,4,-5,5)),2)

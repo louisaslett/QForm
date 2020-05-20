@@ -4,9 +4,14 @@
 \alias{TestQFGaussBounds}
 \title{Test function for a QFGaussBounds}
 \usage{
-TestQFGaussBounds(fullcdf, k = min(20, floor(length(attr(fullcdf,
-  "f.eta"))/2)), n.bound.points = 16, lower.tail.end = 20,
-  upper.tail.end = 20, parallel.sapply = base::sapply)
+TestQFGaussBounds(
+  fullcdf,
+  k = min(20, floor(length(attr(fullcdf, "f.eta"))/2)),
+  n.bound.points = 16,
+  lower.tail.end = 20,
+  upper.tail.end = 20,
+  parallel.sapply = base::sapply
+)
 }
 \arguments{
 \item{fullcdf}{QFGaussCDF; the target CDF including all terms}
@@ -29,7 +34,8 @@ Compares the CDF bounds inferred by QFGaussBounds to a truncated approximation o
 }
 \details{
 Here, \code{fullcdf} is taken to be the CDF of the target random variable \eqn{Q_f} (see documentation of \code{\link{QFGauss}} for definitions).
-Four plots are produced.  The top-left plot overlays the target CDF of \eqn{Q_f}, \code{fullcdf}, computed by \code{QFGauss} (in black) and a truncated approximation to that CDF (in orange) based on simply adding the expectation of the remainder term \eqn{R_f} to the top-k truncated version of \code{fullcdf}, \eqn{T_f}.  By "top-k" here we mean taking the terms of \eqn{Q_f} with the largest magnitude coefficients, \code{f.eta}, and using that to define \eqn{T_f}, which is what is done in \code{TestQFGaussBounds} internally.  This orange line is the approximation targeted by FastSKAT and related approximation methods.
+Four plots are produced.  The top-left plot overlays the target CDF of \eqn{Q_f}, \code{fullcdf}, computed by \code{QFGauss} (in black) and a truncated approximation to that CDF (in orange) based on simply adding the expectation of the remainder term \eqn{R_f} to the top-k truncated version of \code{fullcdf}, \eqn{T_f}.  By "top-k" here we mean taking the terms of \eqn{Q_f} with the largest magnitude coefficients, \code{f.eta}, and using that to define \eqn{T_f}, which is what is done in \code{TestQFGaussBounds} internally.
+The green line is a similar approximation but where \eqn{R_f} is approximated with a moment-matching gaussian.
 The upper and lower bounds on \code{fullcdf} computed by \code{QFGaussBounds} are plotted as red and blue circles respectively.
 The upper and lower bounds on \code{fullcdf} computed by a naive quadrature-based implementation of the bounds are plotted as red and blue Xs respectively.
 The top-right plot shows the difference between the truncated approximation of the CDF and \code{fullcdf} in log space.  It may be interpreted as follows.  The x-axis plots the -log_10 p-value one would have reported based on the truncated approximation alone.  The y-axis is the difference between
