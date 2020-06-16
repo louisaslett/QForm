@@ -3,6 +3,7 @@
 #' Returns a function for calculating upper and lower bounds on the CDF for random variables \eqn{Q_f = T_f + R_f} where \deqn{T_f = \sum\limits_{i \in \mathcal{T}} f\left(\eta_i \right) \left(Z_i + \delta_i)^2,}{T_f = \Sigma_{i \in T} f (\eta_i) (Z_i + \delta_i)^2,}
 #' \deqn{R_f = \sum\limits_{i \in \mathcal{R}} f\left(\eta_i \right) \left(Z_i + \delta_i)^2,}{R_f = \Sigma_{i \in R} f (\eta_i) (Z_i + \delta_i)^2,} where \eqn{Z_i \sim N(0,1)}{Z_i ~ N(0,1)}, and only the CDF of \eqn{T_f} is known.
 #'
+#' If \code{max.abs.eta} < \code{.Machine$double.eps}, then the contribution of \eqn{R_f} to \eqn{Q_f} is ignored for numerical stability and the function returned is simply wrapper for the provided CDF of \eqn{T_f}.  If this is not desired, a user may want to consider rescaling \eqn{Q_f} to avoid this behavior.
 #' Currently only \eqn{f = "identity"} is supported, but future versions will allow one to select \eqn{f} from a list or specify their own function with its corresponding bounds through a QFormFunction object.
 #'
 #' The returned bounds function takes a vector of observed values \code{q} at which to calculate bounds as it's main argument. If \code{q} is not known exactly, but only a lower bound \code{ql} and an upper bound \code{qu} are known, then those may provided instead of \code{q} and the returned bounds on the CDF will be valid for a \code{q} in \code{[ql,qu]}.  If \code{q} is provided, \code{ql} and \code{qu} are ignored.
@@ -73,193 +74,210 @@ QFGaussBounds <- function(cdf, f = "identity", max.abs.eta, sum.eta, sum.etasq, 
   if(any(is.na(c(a.l,b.l,a.r,b.r)))){stop("cdf cannot be bounded because at least one tail is missing: tail extrapolation in QFGauss failed, see ?QFGauss for details.")}
 
 
-  if(max.abs.eta <= 0){stop("max.eta must be positive")}
+  if(max.abs.eta <= 0){stop("max.abs.eta must be positive")}
 
+  if(max.abs.eta > sqrt(sum.etasq)){stop("max.abs.eta cannot be greater than sqrt(sum.etasq).")}
 
-  # Create set of integration functions needed for integrating over the extrapolated tails of cdf corresponding to
-  # the concentration bound for f
-  if(f == "identity"){
+  if(max.abs.eta < .Machine$double.eps){
+    warning("max.abs.eta is smaller than .Machine$double.eps so remainder term ignored (see Details).")
 
-    nu <- 8*(sum.etasq.deltasq + (log(4)-1)*sum.etasq)
+    bound.func <- function(X){
+      ql <- X[1]
+      qu <- X[2]
 
-    conc.ineqs <- QForm:::WrapConcIneq.identity(sum.eta.deltasq + sum.eta,
-                                                sum.eta.deltasq + sum.eta,
-                                                nu,
-                                                1/(4*max.abs.eta))
-    saddlepoint.coeff <- 1/sqrt(2*pi*nu)
+      ans <- c(cdf(ql), cdf(qu), cdf(ql, lower.tail = FALSE), cdf(qu, lower.tail = FALSE))
 
-  }else{
-    stop("For now, identity is the only valid option for f")
-  }
-
-
-  # Create bounding function
-  bound.func <- function(X){
-    ql <- X[1]
-    qu <- X[2]
-
-    # Initialize
-    upper.components <- lower.components <- rep(0,5)
-    # The first component here is a relic from a previous version.  That element will be removed in a later version.
-
-    upper.components.4.alt <- lower.components.4.alt <- 1
-
-    ### Compute Upper Bound
-
-    if(qu-conc.ineqs$c2 < ep.l){
-
-      if(support=="all.reals"){
-        upper.components[2] <- conc.ineqs$int.h2.expx(qu-conc.ineqs$c2,ep.l,qu,a.l,b.l)
-        upper.components[4] <- conc.ineqs$int.h2.const(ep.r,Inf,qu)
-        upper.components.4.alt <- conc.ineqs$int.h2.const(ep.r,Inf,qu, one.minus = TRUE)
-        upper.components[5] <- -conc.ineqs$int.h2.expx(ep.r,Inf,qu,a.r,b.r)
-      }
-      if(support=="pos.reals"){
-        upper.components[2] <- conc.ineqs$int.h2.explogx(max(qu-conc.ineqs$c2,0),ep.l,qu,a.l,b.l)
-        upper.components[4] <- conc.ineqs$int.h2.const(ep.r,Inf,qu)
-        upper.components.4.alt <- conc.ineqs$int.h2.const(ep.r,Inf,qu, one.minus = TRUE)
-        upper.components[5] <- -conc.ineqs$int.h2.expx(ep.r,Inf,qu,a.r,b.r)
-      }
-      if(support=="neg.reals"){
-        upper.components[2] <- conc.ineqs$int.h2.expx(qu-conc.ineqs$c2,ep.l,qu,a.l,b.l)
-        upper.components[4] <- conc.ineqs$int.h2.const(ep.r,Inf,qu) # This integrates out to infinity because we need to account for the constant plateau of the NSD density above 0
-        upper.components.4.alt <- conc.ineqs$int.h2.const(ep.r,Inf,qu, one.minus = TRUE)
-        upper.components[5] <- -conc.ineqs$int.h2.explognegx(ep.r,0,qu,a.r,b.r)
-      }
-
-      #upper.components[3] <- boole(ep.l,t.cdf$x, conc.ineqs$h2(qu,t.cdf$x)*t.cdf$y) #Boole integral from ep.l to t.cdf$x[n]
-      upper.components[3] <- QForm:::GaussQuadCDF(ep.l, ep.r, F, cdf, ql, qu, conc.ineqs) #Gauss Quad integral from ep.l to t.cdf$x[n]
-
-    }
-
-    if((qu-conc.ineqs$c2 >= ep.l) & (qu-conc.ineqs$c2 < ep.r)){
-
-      if(support=="all.reals"){
-        upper.components[4] <- conc.ineqs$int.h2.const(ep.r,Inf,qu)
-        upper.components.4.alt <- conc.ineqs$int.h2.const(ep.r,Inf,qu, one.minus = TRUE)
-        upper.components[5] <- -conc.ineqs$int.h2.expx(ep.r,Inf,qu,a.r,b.r)
-      }
-      if(support=="pos.reals"){
-        upper.components[4] <- conc.ineqs$int.h2.const(ep.r,Inf,qu)
-        upper.components.4.alt <- conc.ineqs$int.h2.const(ep.r,Inf,qu, one.minus = TRUE)
-        upper.components[5] <- -conc.ineqs$int.h2.expx(ep.r,Inf,qu,a.r,b.r)
-      }
-      if(support=="neg.reals"){
-        upper.components[4] <- conc.ineqs$int.h2.const(ep.r,Inf,qu) # This integrates out to infinity because we need to account for the constant plateau of the NSD density above 0
-        upper.components.4.alt <- conc.ineqs$int.h2.const(ep.r,Inf,qu, one.minus = TRUE)
-        upper.components[5] <- -conc.ineqs$int.h2.explognegx(ep.r,0,qu,a.r,b.r)
-      }
-
-      #upper.components[3] <- boole(qu,t.cdf$x, conc.ineqs$h2(qu,t.cdf$x)*t.cdf$y) #Boole integral from qu to t.cdf$x[n]
-      upper.components[3] <- QForm:::GaussQuadCDF(qu-conc.ineqs$c2, ep.r, F, cdf, ql, qu, conc.ineqs) #Gauss Quad integral from qu to t.cdf$x[n]
-
-    }
-
-    if(qu-conc.ineqs$c2 >= ep.r){
-
-      if(support=="all.reals"){
-        upper.components[4] <- conc.ineqs$int.h2.const(qu-conc.ineqs$c2,Inf,qu)
-        upper.components.4.alt <- conc.ineqs$int.h2.const(qu-conc.ineqs$c2,Inf,qu, one.minus = TRUE)
-        upper.components[5] <- -conc.ineqs$int.h2.expx(qu-conc.ineqs$c2,Inf,qu,a.r,b.r)
-      }
-      if(support=="pos.reals"){
-        upper.components[4] <- conc.ineqs$int.h2.const(qu-conc.ineqs$c2,Inf,qu)
-        upper.components.4.alt <- conc.ineqs$int.h2.const(qu-conc.ineqs$c2,Inf,qu, one.minus = TRUE)
-        upper.components[5] <- -conc.ineqs$int.h2.expx(qu-conc.ineqs$c2,Inf,qu,a.r,b.r)
-      }
-      if(support=="neg.reals"){
-        upper.components[4] <- conc.ineqs$int.h2.const(qu-conc.ineqs$c2,Inf,qu) # This integrates out to infinity because we need to account for the constant plateau of the NSD density above 0
-        upper.components.4.alt <- conc.ineqs$int.h2.const(qu-conc.ineqs$c2,Inf,qu, one.minus = TRUE)
-        upper.components[5] <- -conc.ineqs$int.h2.explognegx(qu-conc.ineqs$c2,0,qu,a.r,b.r)
-      }
-
-    }
-
-
-    ### Compute Lower Bound
-
-    if(ql-conc.ineqs$c1 > ep.r){
-
-      if(support=="all.reals"){
-        lower.components[2] <- conc.ineqs$int.h1.expx(-Inf,ep.l,ql,a.l,b.l)
-        lower.components[4] <- conc.ineqs$int.h1.const(ep.r,ql-conc.ineqs$c1,ql)
-        lower.components.4.alt <- conc.ineqs$int.h1.const(ep.r,ql-conc.ineqs$c1,ql, one.minus = TRUE)
-        lower.components[5] <- -conc.ineqs$int.h1.expx(ep.r,ql-conc.ineqs$c1,ql,a.r,b.r)
-      }
-      if(support=="pos.reals"){
-        lower.components[2] <- conc.ineqs$int.h1.explogx(0,ep.l,ql,a.l,b.l)
-        lower.components[4] <- conc.ineqs$int.h1.const(ep.r,ql-conc.ineqs$c1,ql)
-        lower.components.4.alt <- conc.ineqs$int.h1.const(ep.r,ql-conc.ineqs$c1,ql, one.minus = TRUE)
-        lower.components[5] <- -conc.ineqs$int.h1.expx(ep.r,ql-conc.ineqs$c1,ql,a.r,b.r)
-      }
-      if(support=="neg.reals"){
-        lower.components[2] <- conc.ineqs$int.h1.expx(-Inf,ep.l,ql,a.l,b.l)
-        lower.components[4] <- conc.ineqs$int.h1.const(ep.r,ql-conc.ineqs$c1,ql) # This integrates out to ql instead of min(ql,0) because we need to account for the constant plateau of the NSD density above 0
-        lower.components.4.alt <- conc.ineqs$int.h1.const(ep.r,ql-conc.ineqs$c1,ql, one.minus = TRUE)
-        lower.components[5] <- -conc.ineqs$int.h1.explognegx(ep.r,min(0,ql-conc.ineqs$c1),ql,a.r,b.r)
-      }
-
-      #lower.components[3] <- boole(ep.l,t.cdf$x, conc.ineqs$h1(ql,t.cdf$x)*t.cdf$y) #Boole integral from ep.l to t.cdf$x[n]
-      lower.components[3] <- QForm:::GaussQuadCDF(ep.l, ep.r, T, cdf, ql, qu, conc.ineqs) #Gauss Quad integral from ep.l to t.cdf$x[n]
-
-    }
-
-    if((ql-conc.ineqs$c1 > ep.l) & (ql-conc.ineqs$c1 <= ep.r)){
-
-      if(support=="all.reals"){
-        lower.components[2] <- conc.ineqs$int.h1.expx(-Inf,ep.l,ql,a.l,b.l)
-      }
-      if(support=="pos.reals"){
-        lower.components[2] <- conc.ineqs$int.h1.explogx(0,ep.l,ql,a.l,b.l)
-      }
-      if(support=="neg.reals"){
-        lower.components[2] <- conc.ineqs$int.h1.expx(-Inf,ep.l,ql,a.l,b.l)
-      }
-
-      #lower.components[3] <- boole(ql,t.cdf$x, conc.ineqs$h1(ql,t.cdf$x)*t.cdf$y,int.to.right = F) #Boole integral from ep.l to t.cdf$x[n]
-      lower.components[3] <- QForm:::GaussQuadCDF(ep.l, ql-conc.ineqs$c1, T, cdf, ql, qu, conc.ineqs) #Gauss Quad integral from ep.l to ql
-    }
-
-    if(ql-conc.ineqs$c1 <= ep.l){
-
-      if(support=="all.reals"){
-        lower.components[2] <- conc.ineqs$int.h1.expx(-Inf,ql-conc.ineqs$c1,ql,a.l,b.l)
-      }
-      if(support=="pos.reals"){
-        lower.components[2] <- conc.ineqs$int.h1.explogx(0,ql-conc.ineqs$c1,ql,a.l,b.l)
-      }
-      if(support=="neg.reals"){
-        lower.components[2] <- conc.ineqs$int.h1.expx(-Inf,ql-conc.ineqs$c1,ql,a.l,b.l)
-      }
-
-    }
-
-    # Sum across components
-
-    one.minus.upper.components <- - upper.components
-    one.minus.upper.components[4] <- upper.components.4.alt
-
-    one.minus.lower.components <- - lower.components
-    one.minus.lower.components[4] <- lower.components.4.alt
-
-    #RC: Could revisit this approach to numerically adding in the two parts of the const integral, but that seems to be
-    # the part that causes the greatest trouble and this seems to work well for now so will avoid introducing other dependencies
-    # though using a more standard safe sum approach on the components plus the two coming from the const integral might be
-    # better as we enter either tail of the distribution
-
-    ans <- QFRestrictInterval(c(QFSaferSum(lower.components),
-                                QFSaferSum(upper.components),
-                                QFSaferSum(one.minus.lower.components),
-                                QFSaferSum(one.minus.upper.components)))
-
-    if(include.saddlepoint & f == "identity"){
-      ans <- c(ans[1], saddlepoint.coeff * (ans[1] + ans[2]),ans[2],
-               ans[3], saddlepoint.coeff * (ans[3] + ans[4]),ans[4])
-      names(ans) <- c("lower.bound","sp.approx","upper.bound","one.minus.lower.bound","one.minus.sp.approx","one.minus.upper.bound")
-      return(ans)
-    }else{
       names(ans) <- c("lower.bound","upper.bound","one.minus.lower.bound","one.minus.upper.bound")
       return(ans)
+    }
+
+  } else {
+
+    # Create set of integration functions needed for integrating over the extrapolated tails of cdf corresponding to
+    # the concentration bound for f
+    if(f == "identity"){
+
+      nu <- 8*(sum.etasq.deltasq + (log(4)-1)*sum.etasq)
+
+      conc.ineqs <- QForm:::WrapConcIneq.identity(sum.eta.deltasq + sum.eta,
+                                                  sum.eta.deltasq + sum.eta,
+                                                  nu,
+                                                  1/(4*max.abs.eta))
+      saddlepoint.coeff <- 1/sqrt(2*pi*nu)
+
+    }else{
+      stop("For now, identity is the only valid option for f")
+    }
+
+
+    # Create bounding function
+    bound.func <- function(X){
+      ql <- X[1]
+      qu <- X[2]
+
+      # Initialize
+      upper.components <- lower.components <- rep(0,5)
+      # The first component here is a relic from a previous version.  That element will be removed in a later version.
+
+      upper.components.4.alt <- lower.components.4.alt <- 1
+
+      ### Compute Upper Bound
+
+      if(qu-conc.ineqs$c2 < ep.l){
+
+        if(support=="all.reals"){
+          upper.components[2] <- conc.ineqs$int.h2.expx(qu-conc.ineqs$c2,ep.l,qu,a.l,b.l)
+          upper.components[4] <- conc.ineqs$int.h2.const(ep.r,Inf,qu)
+          upper.components.4.alt <- conc.ineqs$int.h2.const(ep.r,Inf,qu, one.minus = TRUE)
+          upper.components[5] <- -conc.ineqs$int.h2.expx(ep.r,Inf,qu,a.r,b.r)
+        }
+        if(support=="pos.reals"){
+          upper.components[2] <- conc.ineqs$int.h2.explogx(max(qu-conc.ineqs$c2,0),ep.l,qu,a.l,b.l)
+          upper.components[4] <- conc.ineqs$int.h2.const(ep.r,Inf,qu)
+          upper.components.4.alt <- conc.ineqs$int.h2.const(ep.r,Inf,qu, one.minus = TRUE)
+          upper.components[5] <- -conc.ineqs$int.h2.expx(ep.r,Inf,qu,a.r,b.r)
+        }
+        if(support=="neg.reals"){
+          upper.components[2] <- conc.ineqs$int.h2.expx(qu-conc.ineqs$c2,ep.l,qu,a.l,b.l)
+          upper.components[4] <- conc.ineqs$int.h2.const(ep.r,Inf,qu) # This integrates out to infinity because we need to account for the constant plateau of the NSD density above 0
+          upper.components.4.alt <- conc.ineqs$int.h2.const(ep.r,Inf,qu, one.minus = TRUE)
+          upper.components[5] <- -conc.ineqs$int.h2.explognegx(ep.r,0,qu,a.r,b.r)
+        }
+
+        #upper.components[3] <- boole(ep.l,t.cdf$x, conc.ineqs$h2(qu,t.cdf$x)*t.cdf$y) #Boole integral from ep.l to t.cdf$x[n]
+        upper.components[3] <- QForm:::GaussQuadCDF(ep.l, ep.r, F, cdf, ql, qu, conc.ineqs) #Gauss Quad integral from ep.l to t.cdf$x[n]
+
+      }
+
+      if((qu-conc.ineqs$c2 >= ep.l) & (qu-conc.ineqs$c2 < ep.r)){
+
+        if(support=="all.reals"){
+          upper.components[4] <- conc.ineqs$int.h2.const(ep.r,Inf,qu)
+          upper.components.4.alt <- conc.ineqs$int.h2.const(ep.r,Inf,qu, one.minus = TRUE)
+          upper.components[5] <- -conc.ineqs$int.h2.expx(ep.r,Inf,qu,a.r,b.r)
+        }
+        if(support=="pos.reals"){
+          upper.components[4] <- conc.ineqs$int.h2.const(ep.r,Inf,qu)
+          upper.components.4.alt <- conc.ineqs$int.h2.const(ep.r,Inf,qu, one.minus = TRUE)
+          upper.components[5] <- -conc.ineqs$int.h2.expx(ep.r,Inf,qu,a.r,b.r)
+        }
+        if(support=="neg.reals"){
+          upper.components[4] <- conc.ineqs$int.h2.const(ep.r,Inf,qu) # This integrates out to infinity because we need to account for the constant plateau of the NSD density above 0
+          upper.components.4.alt <- conc.ineqs$int.h2.const(ep.r,Inf,qu, one.minus = TRUE)
+          upper.components[5] <- -conc.ineqs$int.h2.explognegx(ep.r,0,qu,a.r,b.r)
+        }
+
+        #upper.components[3] <- boole(qu,t.cdf$x, conc.ineqs$h2(qu,t.cdf$x)*t.cdf$y) #Boole integral from qu to t.cdf$x[n]
+        upper.components[3] <- QForm:::GaussQuadCDF(qu-conc.ineqs$c2, ep.r, F, cdf, ql, qu, conc.ineqs) #Gauss Quad integral from qu to t.cdf$x[n]
+
+      }
+
+      if(qu-conc.ineqs$c2 >= ep.r){
+
+        if(support=="all.reals"){
+          upper.components[4] <- conc.ineqs$int.h2.const(qu-conc.ineqs$c2,Inf,qu)
+          upper.components.4.alt <- conc.ineqs$int.h2.const(qu-conc.ineqs$c2,Inf,qu, one.minus = TRUE)
+          upper.components[5] <- -conc.ineqs$int.h2.expx(qu-conc.ineqs$c2,Inf,qu,a.r,b.r)
+        }
+        if(support=="pos.reals"){
+          upper.components[4] <- conc.ineqs$int.h2.const(qu-conc.ineqs$c2,Inf,qu)
+          upper.components.4.alt <- conc.ineqs$int.h2.const(qu-conc.ineqs$c2,Inf,qu, one.minus = TRUE)
+          upper.components[5] <- -conc.ineqs$int.h2.expx(qu-conc.ineqs$c2,Inf,qu,a.r,b.r)
+        }
+        if(support=="neg.reals"){
+          upper.components[4] <- conc.ineqs$int.h2.const(qu-conc.ineqs$c2,Inf,qu) # This integrates out to infinity because we need to account for the constant plateau of the NSD density above 0
+          upper.components.4.alt <- conc.ineqs$int.h2.const(qu-conc.ineqs$c2,Inf,qu, one.minus = TRUE)
+          upper.components[5] <- -conc.ineqs$int.h2.explognegx(qu-conc.ineqs$c2,0,qu,a.r,b.r)
+        }
+
+      }
+
+
+      ### Compute Lower Bound
+
+      if(ql-conc.ineqs$c1 > ep.r){
+
+        if(support=="all.reals"){
+          lower.components[2] <- conc.ineqs$int.h1.expx(-Inf,ep.l,ql,a.l,b.l)
+          lower.components[4] <- conc.ineqs$int.h1.const(ep.r,ql-conc.ineqs$c1,ql)
+          lower.components.4.alt <- conc.ineqs$int.h1.const(ep.r,ql-conc.ineqs$c1,ql, one.minus = TRUE)
+          lower.components[5] <- -conc.ineqs$int.h1.expx(ep.r,ql-conc.ineqs$c1,ql,a.r,b.r)
+        }
+        if(support=="pos.reals"){
+          lower.components[2] <- conc.ineqs$int.h1.explogx(0,ep.l,ql,a.l,b.l)
+          lower.components[4] <- conc.ineqs$int.h1.const(ep.r,ql-conc.ineqs$c1,ql)
+          lower.components.4.alt <- conc.ineqs$int.h1.const(ep.r,ql-conc.ineqs$c1,ql, one.minus = TRUE)
+          lower.components[5] <- -conc.ineqs$int.h1.expx(ep.r,ql-conc.ineqs$c1,ql,a.r,b.r)
+        }
+        if(support=="neg.reals"){
+          lower.components[2] <- conc.ineqs$int.h1.expx(-Inf,ep.l,ql,a.l,b.l)
+          lower.components[4] <- conc.ineqs$int.h1.const(ep.r,ql-conc.ineqs$c1,ql) # This integrates out to ql instead of min(ql,0) because we need to account for the constant plateau of the NSD density above 0
+          lower.components.4.alt <- conc.ineqs$int.h1.const(ep.r,ql-conc.ineqs$c1,ql, one.minus = TRUE)
+          lower.components[5] <- -conc.ineqs$int.h1.explognegx(ep.r,min(0,ql-conc.ineqs$c1),ql,a.r,b.r)
+        }
+
+        #lower.components[3] <- boole(ep.l,t.cdf$x, conc.ineqs$h1(ql,t.cdf$x)*t.cdf$y) #Boole integral from ep.l to t.cdf$x[n]
+        lower.components[3] <- QForm:::GaussQuadCDF(ep.l, ep.r, T, cdf, ql, qu, conc.ineqs) #Gauss Quad integral from ep.l to t.cdf$x[n]
+
+      }
+
+      if((ql-conc.ineqs$c1 > ep.l) & (ql-conc.ineqs$c1 <= ep.r)){
+
+        if(support=="all.reals"){
+          lower.components[2] <- conc.ineqs$int.h1.expx(-Inf,ep.l,ql,a.l,b.l)
+        }
+        if(support=="pos.reals"){
+          lower.components[2] <- conc.ineqs$int.h1.explogx(0,ep.l,ql,a.l,b.l)
+        }
+        if(support=="neg.reals"){
+          lower.components[2] <- conc.ineqs$int.h1.expx(-Inf,ep.l,ql,a.l,b.l)
+        }
+
+        #lower.components[3] <- boole(ql,t.cdf$x, conc.ineqs$h1(ql,t.cdf$x)*t.cdf$y,int.to.right = F) #Boole integral from ep.l to t.cdf$x[n]
+        lower.components[3] <- QForm:::GaussQuadCDF(ep.l, ql-conc.ineqs$c1, T, cdf, ql, qu, conc.ineqs) #Gauss Quad integral from ep.l to ql
+      }
+
+      if(ql-conc.ineqs$c1 <= ep.l){
+
+        if(support=="all.reals"){
+          lower.components[2] <- conc.ineqs$int.h1.expx(-Inf,ql-conc.ineqs$c1,ql,a.l,b.l)
+        }
+        if(support=="pos.reals"){
+          lower.components[2] <- conc.ineqs$int.h1.explogx(0,ql-conc.ineqs$c1,ql,a.l,b.l)
+        }
+        if(support=="neg.reals"){
+          lower.components[2] <- conc.ineqs$int.h1.expx(-Inf,ql-conc.ineqs$c1,ql,a.l,b.l)
+        }
+
+      }
+
+      # Sum across components
+
+      one.minus.upper.components <- - upper.components
+      one.minus.upper.components[4] <- upper.components.4.alt
+
+      one.minus.lower.components <- - lower.components
+      one.minus.lower.components[4] <- lower.components.4.alt
+
+      #RC: Could revisit this approach to numerically adding in the two parts of the const integral, but that seems to be
+      # the part that causes the greatest trouble and this seems to work well for now so will avoid introducing other dependencies
+      # though using a more standard safe sum approach on the components plus the two coming from the const integral might be
+      # better as we enter either tail of the distribution
+
+      ans <- QFRestrictInterval(c(QFSaferSum(lower.components),
+                                  QFSaferSum(upper.components),
+                                  QFSaferSum(one.minus.lower.components),
+                                  QFSaferSum(one.minus.upper.components)))
+
+      if(include.saddlepoint & f == "identity"){
+        ans <- c(ans[1], saddlepoint.coeff * (ans[1] + ans[2]),ans[2],
+                 ans[3], saddlepoint.coeff * (ans[3] + ans[4]),ans[4])
+        names(ans) <- c("lower.bound","sp.approx","upper.bound","one.minus.lower.bound","one.minus.sp.approx","one.minus.upper.bound")
+        return(ans)
+      }else{
+        names(ans) <- c("lower.bound","upper.bound","one.minus.lower.bound","one.minus.upper.bound")
+        return(ans)
+      }
     }
   }
 
@@ -415,14 +433,14 @@ TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.e
 
 
   true.pval.uppertail <- fullcdf(suppressWarnings(uniroot(function(z) {- approxfullcdf(z,lower.tail = F,log.p = T) / log(10) - 8},
-                                         lower = attr(approxfullcdf,"mu")-2*attr(approxfullcdf,"Q.sd"),
-                                         upper = attr(approxfullcdf,"mu") + 0.1*attr(approxfullcdf,"Q.sd"),
-                                         tol = .Machine$double.eps, extendInt = "upX")$root),lower.tail = F)
+                                                          lower = attr(approxfullcdf,"mu")-2*attr(approxfullcdf,"Q.sd"),
+                                                          upper = attr(approxfullcdf,"mu") + 0.1*attr(approxfullcdf,"Q.sd"),
+                                                          tol = .Machine$double.eps, extendInt = "upX")$root),lower.tail = F)
 
   true.pval.lowertail <- fullcdf(suppressWarnings(uniroot(function(z) {- approxfullcdf(z,log.p = T) / log(10) - 8},
-                                         lower = attr(approxfullcdf,"mu")-0.1*attr(approxfullcdf,"Q.sd"),
-                                         upper = attr(approxfullcdf,"mu") + 2*attr(approxfullcdf,"Q.sd"),
-                                         tol = .Machine$double.eps, extendInt = "downX")$root))
+                                                          lower = attr(approxfullcdf,"mu")-0.1*attr(approxfullcdf,"Q.sd"),
+                                                          upper = attr(approxfullcdf,"mu") + 2*attr(approxfullcdf,"Q.sd"),
+                                                          tol = .Machine$double.eps, extendInt = "downX")$root))
 
   yy.uppertail <- -fullcdf(x,lower.tail = F, log.p = T)/log(10) + approxfullcdf(x,lower.tail = F, log.p = T)/log(10)
   yy.lowertail <- -fullcdf(x, log.p = T)/log(10) + approxfullcdf(x, log.p = T)/log(10)
@@ -443,7 +461,7 @@ TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.e
        main = paste("At Naive p = 1e-8, upper tail p =",
                     signif(true.pval.uppertail,digits=3),", lower tail p =",signif(true.pval.lowertail,digits=3)),
        font.main = 1, col="darkorange"
-       )
+  )
 
   lines(xx.lowertail,
         yy.lowertail,

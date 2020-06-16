@@ -3,7 +3,7 @@
 ####################
 RawQFGaussBounds <- function(cdf, f= "identity", max.abs.eta, sum.eta, sum.etasq, sum.eta.deltasq = 0, sum.etasq.deltasq = 0){
 
-  nu <- 8*sum.etasq.deltasq + 4*sum.etasq
+  nu <- 8*(sum.etasq.deltasq + (log(4)-1)*sum.etasq)
   L <- 1/(4*max.abs.eta)
   Er <- sum.eta.deltasq + sum.eta
 
