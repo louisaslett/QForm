@@ -38,6 +38,7 @@ Returns a function for calculating upper and lower bounds on the CDF for random 
 \deqn{R_f = \sum\limits_{i \in \mathcal{R}} f\left(\eta_i \right) \left(Z_i + \delta_i)^2,}{R_f = \Sigma_{i \in R} f (\eta_i) (Z_i + \delta_i)^2,} where \eqn{Z_i \sim N(0,1)}{Z_i ~ N(0,1)}, and only the CDF of \eqn{T_f} is known.
 }
 \details{
+If \code{max.abs.eta} < \code{.Machine$double.eps}, then the contribution of \eqn{R_f} to \eqn{Q_f} is ignored for numerical stability and the function returned is simply wrapper for the provided CDF of \eqn{T_f}.  If this is not desired, a user may want to consider rescaling \eqn{Q_f} to avoid this behavior.
 Currently only \eqn{f = "identity"} is supported, but future versions will allow one to select \eqn{f} from a list or specify their own function with its corresponding bounds through a QFormFunction object.
 
 The returned bounds function takes a vector of observed values \code{q} at which to calculate bounds as it's main argument. If \code{q} is not known exactly, but only a lower bound \code{ql} and an upper bound \code{qu} are known, then those may provided instead of \code{q} and the returned bounds on the CDF will be valid for a \code{q} in \code{[ql,qu]}.  If \code{q} is provided, \code{ql} and \code{qu} are ignored.
