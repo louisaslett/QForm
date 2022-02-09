@@ -383,6 +383,11 @@ TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.e
   sum.eta.deltasq <- sum(f.eta[(k+1):length(f.eta)]*(delta[(k+1):length(f.eta)]^2))
   sum.etasq.deltasq <- sum((f.eta[(k+1):length(f.eta)]^2)*(delta[(k+1):length(f.eta)]^2))
 
+  # if f.eta[k] is really large in magnitude compared to the f.eta[(k+1):length(f.eta)] , it's
+  # possible that abs(f.eta[k]) does not place a good enough bound on max.abs.eta.  Here, we use the
+  # fact that the l_2 norm must always dominate the l_\infty to obtain a better bound for max.abs.eta
+  if(max.abs.eta > sqrt(sum.etasq)){max.abs.eta <- sqrt(sum.etasq)}
+
   bound.func <- QFGaussBounds(tcdf,
                               "identity",
                               max.abs.eta,
