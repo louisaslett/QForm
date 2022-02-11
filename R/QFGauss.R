@@ -62,6 +62,9 @@ QFGauss <- function(f.eta, delta = rep(0,length(f.eta)), sigma = 0, n = 2^16-1, 
 
   if(all(f.eta==0)){stop("All f.eta are zero.")}
 
+  if(!all(is.finite(f.eta))){stop("All f.eta must be finite.")}
+  if(!all(is.finite(delta))){stop("All delta must be finite.")}
+
   if(length(sigma)!=1){stop("sigma must have length 1")}
 
   if(sigma < 0){stop("sigma cannot be negative")}
