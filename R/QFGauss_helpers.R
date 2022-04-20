@@ -102,8 +102,12 @@ extrapolate_tail<-function(log.cdf,xx.standardized,start,best,num.windows,right.
   }
 
 log.rho.Q.easy.centered<-function(t,evals.s,ncps,a,mu.s,sigma.s){
-  complex(imaginary = -t*(a+mu.s),real = -0.5*(sigma.s*t)^2)+sum( complex(imaginary=ncps*t*evals.s)/complex(real=1,imaginary=-2*t*evals.s)
-                                        - 0.5*log(complex(real=1,imaginary=-2*t*evals.s))  )
+  if(all(ncps==0)){
+    complex(imaginary = -t*(a+mu.s),real = -0.5*(sigma.s*t)^2) - 0.5*sum(log(complex(real=1,imaginary=-2*t*evals.s)))
+  } else {
+    complex(imaginary = -t*(a+mu.s),real = -0.5*(sigma.s*t)^2)+sum( complex(imaginary=ncps*t*evals.s)/complex(real=1,imaginary=-2*t*evals.s)
+                                                                    - 0.5*log(complex(real=1,imaginary=-2*t*evals.s))  )
+  }
 }
 
 
