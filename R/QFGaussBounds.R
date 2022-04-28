@@ -73,10 +73,10 @@ QFGaussBounds <- function(cdf, f = "identity", max.abs.eta, sum.eta, sum.etasq, 
   # Don't compute bounds if one tail is missing (this may be relaxed in the future)
   if(any(is.na(c(a.l,b.l,a.r,b.r)))){stop("cdf cannot be bounded because at least one tail is missing: tail extrapolation in QFGauss failed, see ?QFGauss for details.")}
 
-  # Basic Input Checks
+
   if(max.abs.eta <= 0){stop("max.abs.eta must be positive")}
+
   if(max.abs.eta > sqrt(sum.etasq)){stop("max.abs.eta cannot be greater than sqrt(sum.etasq).")}
-  if(abs(sum.eta) > sum.etasq){stop("abs(sum.eta) cannot be greater than sum.etasq.")}
 
   if(max.abs.eta < .Machine$double.eps){
     warning("max.abs.eta is smaller than .Machine$double.eps so remainder term ignored (see Details).")
