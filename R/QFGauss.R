@@ -229,28 +229,39 @@ TestQFGauss <- function(cdf, n.samps = 1e4){
 
   old.par <- par(no.readonly = T)
   par(mfrow=c(2,2))
-  samps <- c(colSums(f.eta * (matrix(rnorm(n.samps * length(f.eta)), nrow = length(f.eta)) + delta)^2)) + rnorm(n.samps,sd = sigma)
+
+  # break down samps to be sampled in chunks of 10,000
+  if(n.samps > 1e4){
+    n.samps.v <- diff(floor(seq(0,n.samps,length=ceiling(n.samps/1e4) )))
+  } else {
+    n.samps.v <- n.samps
+  }
+  samps <- as.list(1:length(n.samps.v))
+  for(j in 1:length(n.samps.v)){
+    samps[[j]] <- c(colSums(f.eta * (matrix(rnorm(n.samps.v[j] * length(f.eta)), nrow = length(f.eta)) + delta)^2)) + rnorm(n.samps.v[j],sd = sigma)
+  }
+  samps <- do.call(c,samps)
   qecdf <- ecdf(samps)
 
   x <- calc.plotting.grid(cdf,range(samps))
 
-  plot(x, cdf(x), type = "l", lwd=1.5, ylab = expression(CDF),xlab=expression(T[f]), main=expression(CDF~of~T[f])) # plot lower tail of CDF
+  plot(x, cdf(x), type = "l", lwd=1.5, ylab = expression(CDF),xlab=expression(T[f]), main=expression(CDF~of~T[f]),las=1,bty="n") # plot lower tail of CDF
   lines(x, qecdf(x), lwd=1,col="red") # plot lower tail of CDF
   #legend("topleft",legend=c("QForm CDF","ECDF"),col=c("black","blue"),lty=c(1,3))
 
   if(missing.tail){ ks.pvalue <- NA }else{ ks.pvalue <- signif(ks.test(samps,cdf)$p.value,2) }
 
-  plot(x,cdf(x)-qecdf(x), type="l",ylab = expression(CDF - ECDF), xlab=expression(T[f]), main=paste("Comparison to ECDF: ks.test p-value =", ks.pvalue),lwd=1.5,font.main=1)
+  plot(x,cdf(x)-qecdf(x), type="l",ylab = expression(CDF - ECDF), xlab=expression(T[f]), main=paste("Comparison to ECDF: ks.test p-value =", ks.pvalue),lwd=1.5,font.main=1,las=1,bty="n")
   abline(h=0)
 
   plot(x, -cdf(x, log.p = TRUE)/log(10), type = "l",
-       ylab = expression(-log[10](CDF)), main=expression(-log[10](CDF)), xlab=expression(T[f]))
+       ylab = expression(-log[10](CDF)), main=expression(-log[10](CDF)), xlab=expression(T[f]),las=1,bty="n")
   lines(x,-log10(qecdf(x)),col="red")
   #legend("topright",legend=c("QForm CDF","ECDF"),col=c("black","blue"),lty=c(1,3))
 
 
   plot(x, -cdf(x, lower.tail = FALSE, log.p = TRUE)/log(10), type = "l",
-       ylab = expression(-log[10](1 - CDF)),main=expression(-log[10](1-CDF)), xlab=expression(T[f])) # plot upper tail of CDF
+       ylab = expression(-log[10](1 - CDF)),main=expression(-log[10](1-CDF)), xlab=expression(T[f]),las=1,bty="n") # plot upper tail of CDF
   lines(x,-log1p(-qecdf(x))/log(10),col="red")
   #legend("topleft",legend=c("QForm CDF","ECDF"),col=c("black","blue"),lty=c(1,3))
 
