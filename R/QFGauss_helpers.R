@@ -101,12 +101,18 @@ extrapolate_tail<-function(log.cdf,xx.standardized,start,best,num.windows,right.
   list("b" = b,"best" = best,"successful"=TRUE)
   }
 
-log.rho.Q.easy.centered<-function(t,evals.s,ncps,a,mu.s,sigma.s){
+
+
+condensed.log.rho.Q.easy.centered <-function(t,evals.s,ncps,df,a,mu.s,sigma.s){
   if(all(ncps==0)){
-    complex(imaginary = -t*(a+mu.s),real = -0.5*(sigma.s*t)^2) - 0.5*sum(log(complex(real=1,imaginary=-2*t*evals.s)))
+    complex(imaginary = -t*(a+mu.s),real = -0.5*(sigma.s*t)^2) - 0.5*sum(df*log(complex(real=1,imaginary=-2*t*evals.s)))
   } else {
-    complex(imaginary = -t*(a+mu.s),real = -0.5*(sigma.s*t)^2)+sum( complex(imaginary=ncps*t*evals.s)/complex(real=1,imaginary=-2*t*evals.s)
-                                                                    - 0.5*log(complex(real=1,imaginary=-2*t*evals.s))  )
+    # NOTE: df used in the following line is correctly placed. If you look at the characteristic function of wikipedia for the non-central chi-square
+    # you might think that only the second term inside sum should be multiplied by df, but that assumes that the non-centrality parameters across
+    # all of the chi-squares have already been summed up into a single non-centrality parameter. We have not and cannot do that summing in our case
+    # so the full expression inside the sum must be multiplied by df
+    complex(imaginary = -t*(a+mu.s),real = -0.5*(sigma.s*t)^2)+sum(df*(complex(imaginary=ncps*t*evals.s)/complex(real=1,imaginary=-2*t*evals.s)
+                                                                    - 0.5*log(complex(real=1,imaginary=-2*t*evals.s))))
   }
 }
 
@@ -219,10 +225,16 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), sigma = 0, n = 2^16-1, 
   # Evaluate CDF using FFT
   ######################
 
-  rho <- parallel.sapply(1:n, function(k, a.standardized, b.standardized, n, evals.s, ncps,mu.s,sigma.s) {
-    exp(log.rho.Q.easy.centered((pi*n/(b.standardized-a.standardized))*(2*((k-1)/n)-1),
-                                evals.s,ncps, a.standardized,mu.s,sigma.s)) / (pi*(2*((k-1)/n)-1))
-  }, a.standardized = a.standardized, b.standardized = b.standardized, n = n, evals.s = evals.s, ncps = ncps, mu.s = mu.s, sigma.s = sigma.s)
+  param_rle <- rle(sort(complex(real=evals.s,imaginary=ncps)))
+  condensed_evals.s <- Re(param_rle$values)
+  condensed_ncps <- Im(param_rle$values)
+  df <- param_rle$lengths
+
+  rho <- parallel.sapply(1:n, function(k, a.standardized, b.standardized, n, condensed_evals.s, condensed_ncps, df, mu.s,sigma.s) {
+    exp(condensed.log.rho.Q.easy.centered((pi*n/(b.standardized-a.standardized))*(2*((k-1)/n)-1),
+                                condensed_evals.s,condensed_ncps, df, a.standardized,mu.s,sigma.s)) / (pi*(2*((k-1)/n)-1))
+  }, a.standardized = a.standardized, b.standardized = b.standardized, n = n, condensed_evals.s = condensed_evals.s, condensed_ncps = condensed_ncps, df = df, mu.s = mu.s, sigma.s = sigma.s)
+
 
   fft_cdf <- 0.5 - (Im(fft(rho))*(-1)^(0:(n-1)))/n
 
