@@ -6,7 +6,8 @@
 \usage{
 QFGauss(
   f.eta,
-  delta = rep(0, length(f.eta)),
+  delta2 = rep(0, length(f.eta)),
+  df = rep(1, length(f.eta)),
   sigma = 0,
   n = 2^16 - 1,
   parallel.sapply = base::sapply
@@ -15,7 +16,9 @@ QFGauss(
 \arguments{
 \item{f.eta}{vector; real-valued coefficients, \eqn{f(\eta_i)}, (may be positive or negative)}
 
-\item{delta}{vector; mean shifts for each \eqn{Z_i}}
+\item{delta2}{vector; non-negative real-valued non-centrality parameters for each term (default is 0s). As is standard for chi-squared non-centrality parameters, these are assumed to be already summed across terms when df > 1.}
+
+\item{df}{vector; positive real-valued degrees of freedom for each term (default is vector of 1s), can really increase speed if there are many redundant terms}
 
 \item{n}{numeric; number of points at which to evaluate the characteristic function of \eqn{T_f}, must be odd (see Details).}
 
@@ -45,9 +48,10 @@ A note on unbounded densities: The density of \eqn{T_f} is guaranteed to be boun
 }
 \examples{
 f.eta <- c(-12, -7, 5, 7, -9, 10, 8)
-delta <- c(2, 10, -4, 3, 8, -5, -12)
+delta2 <- c(2, 10, -4, 3, 8, -5, -12)^2
+df <- c(1.1,5.2,0.4,10,1,2.5,1)
 
-cdf <- QFGauss(f.eta, delta)
+cdf <- QFGauss(f.eta, delta2)
 
 # Inspect computed CDF
 plot(cdf)

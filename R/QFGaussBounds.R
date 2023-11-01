@@ -26,9 +26,9 @@
 #' @examples
 #'
 #' f.eta <- c(-12, -7, 5, 7, -9, 10, 8)
-#' delta <- c(2, 10, -4, 3, 8, -5, -12)
+#' delta2 <- c(2, 10, -4, 3, 8, -5, -12)^2
 #'
-#' cdf <- QFGauss(f.eta, delta)
+#' cdf <- QFGauss(f.eta, delta2)
 #'
 #' bounds <- QFGaussBounds(cdf = cdf, f = "identity",
 #'                         max.abs.eta = 10, sum.eta = 5, sum.etasq = 200)
@@ -44,8 +44,8 @@
 #' points(xx, y[,1], col = "blue")
 #' points(xx, y[,2], col = "red")
 #'
-#' # Generate diagnostic plots for bounds
-#' TestQFGaussBounds(QFGauss(c(1,5,-4,-3,10),c(2,-1,4,-5,5)),2)
+#' # Generate diagnostic plots for bounds (currently TestQFGaussBounds only works for cases where the QFGauss produeced CDF has all df = 1.)
+#' TestQFGaussBounds(QFGauss(c(1,5,-4,-3,10),c(2,-1,4,-5,5)^2),2)
 #'
 #' # The function returned by QFGaussBounds can be accelerated by passing it a parallel version of sapply
 #' # In this example we use only 2 parallel workers but more may be added
@@ -70,9 +70,9 @@ QFGaussBounds <- function(cdf, f = "identity", max.abs.eta, sum.eta, sum.etasq, 
   a.r <- tf$a.r
   b.r <- tf$b.r
 
+
   # Don't compute bounds if one tail is missing (this may be relaxed in the future)
   if(any(is.na(c(a.l,b.l,a.r,b.r)))){stop("cdf cannot be bounded because at least one tail is missing: tail extrapolation in QFGauss failed, see ?QFGauss for details.")}
-
 
   if(max.abs.eta <= 0){stop("max.abs.eta must be positive")}
 
@@ -314,7 +314,7 @@ QFGaussBounds <- function(cdf, f = "identity", max.abs.eta, sum.eta, sum.etasq, 
 #' the true -log_10 p-value and the approximate -log_10 p-value.  The difference in p-values in the upper tail is plotted with a solid line.  The difference in p-values in the lower tail is plotted with a dashed line.  This plot effectively shows how far one might be misled by the truncated approximation shifted by the expectation of the remainder terms.
 #' The two bottom plots allow comparison of the empirical CDF (in red) with the computed CDF (in black) in each tail.
 #'
-#' @param fullcdf QFGaussCDF; the target CDF including all terms
+#' @param fullcdf QFGaussCDF; the target CDF including all terms; currently TestQFGaussBounds only works for cases where the QFGauss produeced CDF has all df = 1.
 #' @param k numeric; the number of truncated terms provided to QFGaussBounds from which to bound fullcdf
 #' @param n.bound.points numeric; the number of points at which to evaluate the bounds for plotting
 #' @param lower.tail.end numeric; the -log_10 lower tail probability at which to start each x-axis (default = 20)
@@ -323,7 +323,7 @@ QFGaussBounds <- function(cdf, f = "identity", max.abs.eta, sum.eta, sum.etasq, 
 #' @return There is nothing returned.
 #' @seealso \code{\link{QFGaussBounds}}, \code{\link{TestQFGauss}}
 #' @examples
-#' TestQFGaussBounds(QFGauss(c(1,5,-4,-3),c(2,-1,4,-5)),2)
+#' TestQFGaussBounds(QFGauss(c(1,5,-4,-3),c(2,-1,4,-5)^2),2)
 #' @export
 TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.eta"))/2)), n.bound.points = 16,
                               lower.tail.end = 20, upper.tail.end = 20, parallel.sapply = base::sapply){
@@ -335,7 +335,10 @@ TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.e
   f.eta <- attr(fullcdf,"f.eta")
   if(length(f.eta)==1){stop("fullcdf cannot be compared to truncated version because length(f.eta) is only 1.")}
 
-  delta <- attr(fullcdf,"delta")
+  # Don't compute bounds if any of the df are not equal to 1.
+  if(!all(attr(fullcdf,"df")==1)){stop("TestQFGaussBounds currently only supported for cases where all df == 1")}
+
+  delta2 <- attr(fullcdf,"delta2")
   mu <- attr(fullcdf,"mu")
   Q.sd <- attr(fullcdf,"Q.sd")
 
@@ -375,13 +378,13 @@ TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.e
   par(mfrow=c(2,2))
 
 
-  tcdf <- QFGauss(f.eta[1:k],delta[1:k],parallel.sapply = parallel.sapply)
+  tcdf <- QFGauss(f.eta[1:k],delta2[1:k],parallel.sapply = parallel.sapply)
 
   max.abs.eta <- abs(f.eta[k])
   sum.eta <- sum(f.eta[(k+1):length(f.eta)])
   sum.etasq <- sum(f.eta[(k+1):length(f.eta)]^2)
-  sum.eta.deltasq <- sum(f.eta[(k+1):length(f.eta)]*(delta[(k+1):length(f.eta)]^2))
-  sum.etasq.deltasq <- sum((f.eta[(k+1):length(f.eta)]^2)*(delta[(k+1):length(f.eta)]^2))
+  sum.eta.deltasq <- sum(f.eta[(k+1):length(f.eta)]*delta2[(k+1):length(f.eta)])
+  sum.etasq.deltasq <- sum((f.eta[(k+1):length(f.eta)]^2)*delta2[(k+1):length(f.eta)])
 
   # if f.eta[k] is really large in magnitude compared to the f.eta[(k+1):length(f.eta)] , it's
   # possible that abs(f.eta[k]) does not place a good enough bound on max.abs.eta.  Here, we use the
@@ -416,7 +419,7 @@ TestQFGaussBounds <- function(fullcdf, k = min(20,floor(length(attr(fullcdf,"f.e
 
   VARr <- 2*sum.etasq + 4*sum.etasq.deltasq
 
-  gauss.tcdf <- QFGauss(f.eta[1:k],delta[1:k],sigma = sqrt(VARr), parallel.sapply = parallel.sapply)
+  gauss.tcdf <- QFGauss(f.eta[1:k],delta2[1:k],sigma = sqrt(VARr), parallel.sapply = parallel.sapply)
 
   gauss.approxfullcdf <- function(x, density = FALSE, lower.tail = TRUE, log.p = FALSE) gauss.tcdf(x-Er, density = density, lower.tail = lower.tail, log.p = log.p)
   attr(gauss.approxfullcdf,"mu") <- attr(gauss.tcdf,"mu") + Er

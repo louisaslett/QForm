@@ -107,19 +107,17 @@ condensed.log.rho.Q.easy.centered <-function(t,evals.s,ncps,df,a,mu.s,sigma.s){
   if(all(ncps==0)){
     complex(imaginary = -t*(a+mu.s),real = -0.5*(sigma.s*t)^2) - 0.5*sum(df*log(complex(real=1,imaginary=-2*t*evals.s)))
   } else {
-    # NOTE: df used in the following line is correctly placed. If you look at the characteristic function of wikipedia for the non-central chi-square
-    # you might think that only the second term inside sum should be multiplied by df, but that assumes that the non-centrality parameters across
-    # all of the chi-squares have already been summed up into a single non-centrality parameter. We have not and cannot do that summing in our case
-    # so the full expression inside the sum must be multiplied by df
-    complex(imaginary = -t*(a+mu.s),real = -0.5*(sigma.s*t)^2)+sum(df*(complex(imaginary=ncps*t*evals.s)/complex(real=1,imaginary=-2*t*evals.s)
-                                                                    - 0.5*log(complex(real=1,imaginary=-2*t*evals.s))))
+    # NOTE: df used in the following line is correctly placed. We assume that the non-centrality parameters across
+    # all of the chi-squares have already been summed up into a single non-centrality parameter.
+    complex(imaginary = -t*(a+mu.s),real = -0.5*(sigma.s*t)^2)+sum(complex(imaginary=ncps*t*evals.s)/complex(real=1,imaginary=-2*t*evals.s)
+                                                                    - 0.5*df*log(complex(real=1,imaginary=-2*t*evals.s)))
   }
 }
 
 
 
 
-calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), sigma = 0, n = 2^16-1, parallel.sapply = sapply) {
+calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), df=rep(1,length(evals)),sigma = 0, n = 2^16-1, parallel.sapply = sapply) {
   # This function estimates the CDF of the truncated distribution with the identity function
   # as the function of interest
 
@@ -132,24 +130,24 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), sigma = 0, n = 2^16-1, 
   if(!(is.integer(ncps) | is.numeric(ncps))){stop("ncps must be integer or numeric")}
   ncps <- as.numeric(ncps)
 
+  if(!(is.integer(df) | is.numeric(df))){stop("df must be integer or numeric")}
+  df <- as.numeric(df)
+
   if(!(is.integer(sigma) | is.numeric(sigma))){stop("sigma must be integer or numeric")}
   sigma <- as.numeric(sigma)
 
   if(length(sigma)!=1){stop("sigma must have length 1")}
 
   if(length(evals)!=length(ncps)){stop("length of evals does not equal length of ncps")}
+  if(length(evals)!=length(df)){stop("length of evals does not equal length of df")}
+
+  if(!all(is.finite(evals) & is.finite(ncps) & is.finite(df))){stop("All evals, ncps, and df must be finite.")}
 
   if(any(ncps<0)){stop("ncps must be non-negative.")}
-
-  if(is.infinite(sigma) | any(is.infinite(evals)) | any(is.infinite(ncps))){stop("All evals and ncps must be finite.")}
-
+  if(any(df<=0)){stop("all df must be positive.")}
 
 
   if(all(evals==0)){stop("All evals are 0.")}
-  if(any(evals==0)){
-    evals <- evals[which(evals!=0)]
-    ncps <- ncps[which(evals!=0)]
-  }
 
   if(length(unique(evals))==1){warning("All of the eigenvalues are the same.
                                        Proceeding to result but consider using pchisq instead.")}
@@ -173,8 +171,8 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), sigma = 0, n = 2^16-1, 
   # We center the distribution but standardize by the component with the largest variance, not the total variance
   #########################
 
-  mu <- sum((ncps+1)*evals)
-  v <- 2*(1+2*ncps)*(evals^2)
+  mu <- sum((ncps+df)*evals)
+  v <- 2*(df+2*ncps)*(evals^2)
   Q.sd <- sqrt(sigma^2 + sum(v))
   if(is.infinite(Q.sd)){stop("The variance of the target distribution is too large to be numerically represented on this machine.  Please consider rescaling the target and try again.")}
   s <- sqrt(max(c(v,sigma^2)))
@@ -182,6 +180,7 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), sigma = 0, n = 2^16-1, 
   evals.s <- evals / s
   mu.s <- mu / s
   sigma.s <- sigma / s
+
 
 
   # Determine on how fine a grid we need to FFT (will determine the interval on which we estimate the density)
@@ -194,7 +193,12 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), sigma = 0, n = 2^16-1, 
            z / (4*resid.op.norm.bd) - 0.5*nu / ((4*resid.op.norm.bd)^2) ) / log(10) - bound
   }
 
-  nu <- 8*sum(ncps*(evals.s^2))+4*sum(evals.s^2)+sigma.s^2
+  # WARNING: this definition of nu (and the concentration inequality) is valid for all integer df, but it's not clear that it's valid
+  # for all positive real df. It's probably fine for our purposes of finding a grid of quantiles for FFT grid,
+  # but may lead to failures in cases where say all of the df are fractional
+  # this is partly why we check below that the FFT returned covers the body of the target distribution
+  # we do not include df in first term below because ncps already reflect the sum of squared mean shifts within each chi-square term
+  nu <- 8*sum(ncps*(evals.s^2))+4*sum(df*evals.s^2)+sigma.s^2
 
 
   b.standardized <- uniroot(fft.conc.ineq, lower = 0, upper = 1e3*(Q.sd/s),tol = .Machine$double.eps,
@@ -225,15 +229,15 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), sigma = 0, n = 2^16-1, 
   # Evaluate CDF using FFT
   ######################
 
-  param_rle <- rle(sort(complex(real=evals.s,imaginary=ncps)))
-  condensed_evals.s <- Re(param_rle$values)
-  condensed_ncps <- Im(param_rle$values)
-  df <- param_rle$lengths
+  # param_rle <- rle(sort(complex(real=evals.s,imaginary=ncps)))
+  # condensed_evals.s <- Re(param_rle$values)
+  # condensed_ncps <- Im(param_rle$values)
+  # df <- param_rle$lengths
 
-  rho <- parallel.sapply(1:n, function(k, a.standardized, b.standardized, n, condensed_evals.s, condensed_ncps, df, mu.s,sigma.s) {
+  rho <- parallel.sapply(1:n, function(k, a.standardized, b.standardized, n, evals.s, ncps, df, mu.s,sigma.s) {
     exp(condensed.log.rho.Q.easy.centered((pi*n/(b.standardized-a.standardized))*(2*((k-1)/n)-1),
-                                condensed_evals.s,condensed_ncps, df, a.standardized,mu.s,sigma.s)) / (pi*(2*((k-1)/n)-1))
-  }, a.standardized = a.standardized, b.standardized = b.standardized, n = n, condensed_evals.s = condensed_evals.s, condensed_ncps = condensed_ncps, df = df, mu.s = mu.s, sigma.s = sigma.s)
+                                          evals.s,ncps, df, a.standardized,mu.s,sigma.s)) / (pi*(2*((k-1)/n)-1))
+  }, a.standardized = a.standardized, b.standardized = b.standardized, n = n, evals.s = evals.s, ncps = ncps, df = df, mu.s = mu.s, sigma.s = sigma.s)
 
 
   fft_cdf <- 0.5 - (Im(fft(rho))*(-1)^(0:(n-1)))/n
@@ -245,16 +249,16 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), sigma = 0, n = 2^16-1, 
   xx<-seq(a,b-(b-a)/n,length.out = n)
 
 
-  # Stop if FFT returns something nonsensical
-  if(any(is.nan(fft_cdf))){
-    stop("fft returned NaN values")
+  # Stop if FFT returns something nonsensical or we somehow totally miss the body of the distribution
+  if(any(!is.finite(fft_cdf))){
+    stop("fft returned non-finite values")
   }
-  if(any(is.na(fft_cdf))){
-    stop("fft returned NA values")
+
+  if(!any(fft_cdf >= 0.1 & fft_cdf <= 0.9)){
+    stop("fft missed the body of the distribution: it did not return any quantiles between 0.1 and 0.9, consider increasing n. This may arise in cases where there are terms in the quadratic form with relatively large coefficients that have df < 1.")
   }
-  if(any(is.infinite(fft_cdf))){
-    stop("fft returned infinite values")
-  }
+
+
 
 
   # Begin search for extrapolation points
@@ -548,7 +552,8 @@ calc.plotting.grid <- function(cdf, sample.range = NULL){
 
   fft_used <- attr(cdf,"fft_used")
   f.eta <- attr(cdf,"f.eta")
-  delta <- attr(cdf,"delta")
+  delta2 <- attr(cdf,"delta2")
+  df <- attr(cdf,"df")
   mu <- attr(cdf,"mu")
   Q.sd <- attr(cdf,"Q.sd")
 
@@ -562,10 +567,11 @@ calc.plotting.grid <- function(cdf, sample.range = NULL){
   b.r <- tf$b.r
 
   if(!fft_used){
-    df <- length(f.eta)
+    total_df <- sum(df)
+    total_ncp <- sum(delta2)
     C <- abs(f.eta[1])
-    ep.l <- C*qchisq(1e-16,length(f.eta),sum(delta^2))
-    ep.r <- C*qchisq(1e-16,length(f.eta),sum(delta^2),lower.tail = FALSE)
+    ep.l <- C*qchisq(1e-16,total_df,total_ncp)
+    ep.r <- C*qchisq(1e-16,total_df,total_ncp,lower.tail = FALSE)
   }
 
 

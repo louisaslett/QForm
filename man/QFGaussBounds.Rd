@@ -51,9 +51,9 @@ The returned bounds function can also take a parallel version of sapply from a g
 \examples{
 
 f.eta <- c(-12, -7, 5, 7, -9, 10, 8)
-delta <- c(2, 10, -4, 3, 8, -5, -12)
+delta2 <- c(2, 10, -4, 3, 8, -5, -12)^2
 
-cdf <- QFGauss(f.eta, delta)
+cdf <- QFGauss(f.eta, delta2)
 
 bounds <- QFGaussBounds(cdf = cdf, f = "identity",
                         max.abs.eta = 10, sum.eta = 5, sum.etasq = 200)
@@ -69,8 +69,8 @@ plot(x, cdf(x), type = "l", ylab = expression(CDF),xlab=expression(T[f]), main=e
 points(xx, y[,1], col = "blue")
 points(xx, y[,2], col = "red")
 
-# Generate diagnostic plots for bounds
-TestQFGaussBounds(QFGauss(c(1,5,-4,-3,10),c(2,-1,4,-5,5)),2)
+# Generate diagnostic plots for bounds (currently TestQFGaussBounds only works for cases where the QFGauss produeced CDF has all df = 1.)
+TestQFGaussBounds(QFGauss(c(1,5,-4,-3,10),c(2,-1,4,-5,5)^2),2)
 
 # The function returned by QFGaussBounds can be accelerated by passing it a parallel version of sapply
 # In this example we use only 2 parallel workers but more may be added

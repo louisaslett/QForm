@@ -19,7 +19,8 @@
 #'
 #'
 #' @param f.eta vector; real-valued coefficients, \eqn{f(\eta_i)}, (may be positive or negative)
-#' @param delta vector; mean shifts for each \eqn{Z_i}
+#' @param delta2 vector; non-negative real-valued non-centrality parameters for each term (default is 0s). As is standard for chi-squared non-centrality parameters, these are assumed to be already summed across terms when df > 1.
+#' @param df vector; positive real-valued degrees of freedom for each term (default is vector of 1s), can really increase speed if there are many redundant terms
 #' @param n numeric; number of points at which to evaluate the characteristic function of \eqn{T_f}, must be odd (see Details).
 #' @param parallel.sapply function; a user-provided version of \code{sapply}, see Details.
 #'
@@ -27,9 +28,10 @@
 #' @seealso \code{\link{QFGaussBounds}}, \code{\link{TestQFGauss}}
 #' @examples
 #' f.eta <- c(-12, -7, 5, 7, -9, 10, 8)
-#' delta <- c(2, 10, -4, 3, 8, -5, -12)
+#' delta2 <- c(2, 10, -4, 3, 8, -5, -12)^2
+#' df <- c(1.1,5.2,0.4,10,1,2.5,1)
 #'
-#' cdf <- QFGauss(f.eta, delta)
+#' cdf <- QFGauss(f.eta, delta2)
 #'
 #' # Inspect computed CDF
 #' plot(cdf)
@@ -54,45 +56,49 @@
 #'
 #'
 #' @export
-QFGauss <- function(f.eta, delta = rep(0,length(f.eta)), sigma = 0, n = 2^16-1, parallel.sapply = base::sapply){
+QFGauss <- function(f.eta, delta2 = rep(0,length(f.eta)),  df = rep(1,length(f.eta)), sigma = 0, n = 2^16-1, parallel.sapply = base::sapply){
 
   if(n%%2==0){stop("n must be odd")}
 
-  if(length(f.eta)!=length(delta)){stop("delta does not have the same length as f.eta.")}
-
-  if(all(f.eta==0)){stop("All f.eta are zero.")}
-
-  if(!all(is.finite(f.eta))){stop("All f.eta must be finite.")}
-  if(!all(is.finite(delta))){stop("All delta must be finite.")}
-
+  if(length(f.eta)!=length(delta2)){stop("delta2 does not have the same length as f.eta.")}
+  if(length(f.eta)!=length(df)){stop("df does not have the same length as f.eta.")}
   if(length(sigma)!=1){stop("sigma must have length 1")}
 
+  if(!all(is.finite(f.eta))){stop("All f.eta must be finite.")}
+  if(!all(is.finite(delta2))){stop("All delta2 must be finite.")}
+  if(!all(is.finite(df))){stop("All df must be finite.")}
+  if(!is.finite(sigma)){stop("sigma must be finite.")}
+
+  if(all(f.eta==0)){stop("All f.eta are zero.")}
+  if(any(delta2 < 0)){stop("All delta2 must be >= 0")}
+  if(any(df <= 0)){stop("All df must be > 0")}
   if(sigma < 0){stop("sigma cannot be negative")}
 
-  # Reorder f.eta so that the largest magnitude f.eta come first.  Permute delta accordingly.
+  # Reorder f.eta so that the largest magnitude f.eta come first.  Permute delta2 and df accordingly.
   f.eta.order <- order(abs(f.eta),decreasing=T)
   f.eta <- f.eta[f.eta.order]
-  delta <- delta[f.eta.order]
+  delta2 <- delta2[f.eta.order]
+  df <- df[f.eta.order]
 
 
   if(all(f.eta==f.eta[1]) & sigma==0){
 
-    df <- length(f.eta)
+    total_df <- sum(df)
     C <- abs(f.eta[1])
-    ncp <- sum(delta^2)
+    total_ncp <- sum(delta2)
 
       cdf.func <- function(q, density = FALSE, lower.tail = TRUE, log.p = FALSE){
         if(density){
           if(log.p){
-            return( dchisq((2*(f.eta[1]>0)-1)*q/C,df,ncp,TRUE)-log(C) )
+            return( dchisq((2*(f.eta[1]>0)-1)*q/C,total_df,total_ncp,TRUE)-log(C) )
           }else{
-            return( dchisq((2*(f.eta[1]>0)-1)*q/C,df,ncp)/C )
+            return( dchisq((2*(f.eta[1]>0)-1)*q/C,total_df,total_ncp)/C )
           }
         }else{
           if(f.eta[1] > 0){
-            return( pchisq(q/C,df,ncp,lower.tail,log.p) )
+            return( pchisq(q/C,total_df,total_ncp,lower.tail,log.p) )
           }else{
-            return( pchisq(-q/C,df,ncp,!lower.tail,log.p) )
+            return( pchisq(-q/C,total_df,total_ncp,!lower.tail,log.p) )
 
           }
         }
@@ -107,30 +113,31 @@ QFGauss <- function(f.eta, delta = rep(0,length(f.eta)), sigma = 0, n = 2^16-1, 
       if(f.eta[1]>0){
         # The following equations are found by simply matching the form of the extrapolated bound with the value and derivative
         # of the true cdf at the extrapolation point...this extrapolation helps make integrating the concentration inequality more stable
-        e.r <- C*qchisq(-12*log(10),df,ncp,lower.tail = F,log.p=T)
-        b.r <- exp(dchisq(e.r/C,df,ncp,log = T)-pchisq(e.r/C,df,ncp,F,T)-log(C))
-        a.r <- -pchisq(e.r/C,df,ncp,F,T)-b.r*e.r
-        e.l <- C*qchisq(-12*log(10),df,ncp,lower.tail = T,log.p=T)
-        b.l <- -exp(dchisq(e.l/C,df,ncp,log = T)-pchisq(e.l/C,df,ncp,T,T)-log(C))
-        a.l <- -pchisq(e.l/C,df,ncp,T,T)-b.l*e.l
+        e.r <- C*qchisq(-12*log(10),total_df,total_ncp,lower.tail = F,log.p=T)
+        b.r <- exp(dchisq(e.r/C,total_df,total_ncp,log = T)-pchisq(e.r/C,total_df,total_ncp,F,T)-log(C))
+        a.r <- -pchisq(e.r/C,total_df,total_ncp,F,T)-b.r*e.r
+        e.l <- C*qchisq(-12*log(10),total_df,total_ncp,lower.tail = T,log.p=T)
+        b.l <- -exp(dchisq(e.l/C,total_df,total_ncp,log = T)-pchisq(e.l/C,total_df,total_ncp,T,T)-log(C))
+        a.l <- -pchisq(e.l/C,total_df,total_ncp,T,T)-b.l*e.l
       }
 
       if(f.eta[1]<0){
         # To get the below equations from the above, consider just negating x and taking 1- the form of the CDF to flip the CDF above twice.
-        e.l <- - C*qchisq(-12*log(10),df,sum(delta^2),lower.tail = F,log.p=T)
-        b.l <- -exp(dchisq(-e.l/C,df,ncp,log = T)-pchisq(-e.l/C,df,ncp,F,T)-log(C))
-        a.l <- -pchisq(-e.l/C,df,ncp,F,T)-b.l*e.l
-        e.r <- -C*qchisq(-12*log(10),df,ncp,lower.tail = T,log.p=T)
-        b.r <- -exp(dchisq(-e.r/C,df,ncp,log = T)-pchisq(-e.r/C,df,ncp,T,T)-log(C))
-        a.r <- -pchisq(-e.r/C,df,ncp,T,T)+b.r*e.r
+        e.l <- - C*qchisq(-12*log(10),total_df,sum(delta2),lower.tail = F,log.p=T)
+        b.l <- -exp(dchisq(-e.l/C,total_df,total_ncp,log = T)-pchisq(-e.l/C,total_df,total_ncp,F,T)-log(C))
+        a.l <- -pchisq(-e.l/C,total_df,total_ncp,F,T)-b.l*e.l
+        e.r <- -C*qchisq(-12*log(10),total_df,total_ncp,lower.tail = T,log.p=T)
+        b.r <- -exp(dchisq(-e.r/C,total_df,total_ncp,log = T)-pchisq(-e.r/C,total_df,total_ncp,T,T)-log(C))
+        a.r <- -pchisq(-e.r/C,total_df,total_ncp,T,T)+b.r*e.r
       }
 
 
       attr(cdf.func,"fft_used") <- FALSE
       attr(cdf.func,"f.eta") <- f.eta
-      attr(cdf.func,"delta") <- delta
-      attr(cdf.func,"mu") <- sum(f.eta*(1+delta^2))
-      attr(cdf.func,"Q.sd") <- sum(2*(1+2*delta^2)*f.eta^2)
+      attr(cdf.func,"delta2") <- delta2
+      attr(cdf.func,"df") <- df
+      attr(cdf.func,"mu") <- sum(f.eta*(df+delta2))
+      attr(cdf.func,"Q.sd") <- sum(2*(df+2*delta2)*f.eta^2)
       attr(cdf.func,"tail.features") <- list("support" = ifelse(f.eta[1] > 0,"pos.reals","neg.reals"),
                                              "extrapolation.point.l" = e.l,
                                              "extrapolation.point.r" = e.r,
@@ -142,15 +149,15 @@ QFGauss <- function(f.eta, delta = rep(0,length(f.eta)), sigma = 0, n = 2^16-1, 
     return(cdf.func)
   }
 
-  ncps <- delta^2
-  if(is.infinite(sigma) | any(is.infinite(f.eta)) | any(is.infinite(ncps))){stop("sigma as well as all f.eta and delta^2 must be finite.")}
+  ncps <- delta2
 
-  cdf <- calc.QFcdf(evals = f.eta, ncps = ncps, sigma = sigma, n = n, parallel.sapply = parallel.sapply)
+  cdf <- calc.QFcdf(evals = f.eta, ncps = ncps, df = df, sigma = sigma, n = n, parallel.sapply = parallel.sapply)
   cdf.func <- wrap.QFcdf(cdf)
 
   attr(cdf.func,"fft_used") <- TRUE
   attr(cdf.func,"f.eta") <- f.eta
-  attr(cdf.func,"delta") <- delta
+  attr(cdf.func,"delta2") <- delta2
+  attr(cdf.func,"df") <- df
   attr(cdf.func,"sigma") <- sigma
   attr(cdf.func,"mu") <- cdf$mu
   attr(cdf.func,"Q.sd") <- cdf$Q.sd
@@ -224,7 +231,8 @@ TestQFGauss <- function(cdf, n.samps = 1e4){
   }
 
   f.eta <- attr(cdf,"f.eta")
-  delta <- attr(cdf,"delta")
+  delta2 <- attr(cdf,"delta2")
+  df <- attr(cdf,"df")
   sigma <- attr(cdf,"sigma")
 
   old.par <- par(no.readonly = T)
@@ -238,7 +246,7 @@ TestQFGauss <- function(cdf, n.samps = 1e4){
   }
   samps <- as.list(1:length(n.samps.v))
   for(j in 1:length(n.samps.v)){
-    samps[[j]] <- c(colSums(f.eta * (matrix(rnorm(n.samps.v[j] * length(f.eta)), nrow = length(f.eta)) + delta)^2)) + rnorm(n.samps.v[j],sd = sigma)
+    samps[[j]] <- c(colSums(f.eta * matrix(rchisq(n.samps.v[j] * length(f.eta),df = df,ncp=delta2), nrow = length(f.eta)))) + rnorm(n.samps.v[j],sd = sigma)
   }
   samps <- do.call(c,samps)
   qecdf <- ecdf(samps)

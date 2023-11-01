@@ -14,7 +14,7 @@ TestQFGaussBounds(
 )
 }
 \arguments{
-\item{fullcdf}{QFGaussCDF; the target CDF including all terms}
+\item{fullcdf}{QFGaussCDF; the target CDF including all terms; currently TestQFGaussBounds only works for cases where the QFGauss produeced CDF has all df = 1.}
 
 \item{k}{numeric; the number of truncated terms provided to QFGaussBounds from which to bound fullcdf}
 
@@ -43,7 +43,7 @@ the true -log_10 p-value and the approximate -log_10 p-value.  The difference in
 The two bottom plots allow comparison of the empirical CDF (in red) with the computed CDF (in black) in each tail.
 }
 \examples{
-TestQFGaussBounds(QFGauss(c(1,5,-4,-3),c(2,-1,4,-5)),2)
+TestQFGaussBounds(QFGauss(c(1,5,-4,-3),c(2,-1,4,-5)^2),2)
 }
 \seealso{
 \code{\link{QFGaussBounds}}, \code{\link{TestQFGauss}}
