@@ -1,8 +1,8 @@
 #' Fast CDF/PDF of a Quadratic Form in Gaussians
 #'
-#' Returns the CDF and PDF for random variables \eqn{T_f}{T_f} of the form \deqn{T_f = \sum\limits_i f\left(\eta_i \right) \left(Z_i + \delta_i)^2}{T_f = \Sigma_i f (\eta_i) (Z_i + \delta_i)^2} where \eqn{Z_i \sim N(0,1).}{Z_i ~ N(0,1).}
+#' Returns the CDF and PDF for random variables \eqn{T_f}{T_f} of the form \deqn{T_f = \sum\limits_i f\left(\eta_i \right) \left(Z_i + \delta_i)^2 + \sigma Z_0}{T_f = \Sigma_i f (\eta_i) (Z_i + \delta_i)^2 + \sigma Z_0} where \eqn{Z_i \sim N(0,1).}{Z_i ~ N(0,1).}
 #'
-#' By using the fast Fourier transform and various adjustments for numerical precision, this function is much faster and more reliable than Davie's method and related approaches.
+#' By using the fast Fourier transform and various adjustments for numerical precision, this function is faster and more reliable than Davie's method and related approaches, especially when the returned CDF or PDF is to be evaluated at many points.
 #'
 #' The returned function has three optional, logical arguments.  The first is a \code{density}, which when \code{TRUE}, prompts the function to evaluate the PDF rather than the CDF.  \code{density} defaults to FALSE.  \code{lower.tail} returns 1 minus the CDF when \code{TRUE} (not used if \code{density}==TRUE) and is highly recommended for those interested in the upper tail of \eqn{T_f}.  \code{log.p} returns the desired probabilities in log space.
 #'
@@ -21,7 +21,8 @@
 #' @param f.eta vector; real-valued coefficients, \eqn{f(\eta_i)}, (may be positive or negative)
 #' @param delta2 vector; non-negative real-valued non-centrality parameters for each term (default is 0s). As is standard for chi-squared non-centrality parameters, these are assumed to be already summed across terms when df > 1.
 #' @param df vector; positive real-valued degrees of freedom for each term (default is vector of 1s), can really increase speed if there are many redundant terms
-#' @param n numeric; number of points at which to evaluate the characteristic function of \eqn{T_f}, must be odd (see Details).
+#' @param sigma numeric; standard deviation of optional Gaussian term \eqn{Z_0}, default is 0 (no Gaussian term added)
+#' @param n integer; number of points at which to evaluate the characteristic function of \eqn{T_f}, must be odd (see Details).
 #' @param parallel.sapply function; a user-provided version of \code{sapply}, see Details.
 #'
 #' @return A function that evaluates the CDF or PDF of \eqn{T_f}.
@@ -31,7 +32,7 @@
 #' delta2 <- c(2, 10, -4, 3, 8, -5, -12)^2
 #' df <- c(1.1,5.2,0.4,10,1,2.5,1)
 #'
-#' cdf <- QFGauss(f.eta, delta2)
+#' cdf <- QFGauss(f.eta, delta2, df)
 #'
 #' # Inspect computed CDF
 #' plot(cdf)
@@ -39,7 +40,7 @@
 #' # Plot computed CDF at desired points
 #' x <- seq(-1500, 2000, len = 1e3)
 #' plot(x,cdf(x),type="l", ylab = expression(CDF),xlab=expression(T[f]), main=expression(CDF~of~T[f])) # CDF
-#' plot(x,cdf(x,density = T),type="l", ylab = expression(PDF),xlab=expression(T[f]), main=expression(PDF~of~T[f])) # PDF
+#' plot(x,cdf(x,density = TRUE),type="l", ylab = expression(PDF),xlab=expression(T[f]), main=expression(PDF~of~T[f])) # PDF
 #'
 #' # Compare computed CDF to empirical CDF of target distribution based on 10,000 samples
 #' TestQFGauss(cdf)
@@ -184,15 +185,15 @@ QFGauss <- function(f.eta, delta2 = rep(0,length(f.eta)),  df = rep(1,length(f.e
 #' @return There is nothing returned.
 #'
 #' @export
-plot.QFGaussCDF <- function(cdf,...){
-  if(class(cdf)[1]!="QFGaussCDF"){stop("cdf must be of class QFGaussCDF")}
+plot.QFGaussCDF <- function(x,...){
+  if(class(x)[1]!="QFGaussCDF"){stop("x must be of class QFGaussCDF")}
 
-  if(any(sapply(attr(cdf,"tail.features"),is.na))){warning("plotting domain truncated because at least one tail is missing: tail extrapolation in QFGauss failed, see ?QFGauss for details.")}
+  if(any(sapply(attr(x,"tail.features"),is.na))){warning("plotting domain truncated because at least one tail is missing: tail extrapolation in QFGauss failed, see ?QFGauss for details.")}
 
-  x <- calc.plotting.grid(cdf)
+  xx <- calc.plotting.grid(x)
 
   old.par <- par(no.readonly = T)
-  plot(x, cdf(x), type = "l", lwd=1.5, ylab = expression(CDF),xlab=expression(T[f])) # plot lower tail of CDF
+  plot(xx, x(xx), type = "l", lwd=1.5, ylab = expression(CDF),xlab=expression(T[f])) # plot lower tail of CDF
   par(old.par)
 }
 

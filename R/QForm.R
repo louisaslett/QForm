@@ -23,7 +23,7 @@
 #' \code{\link{QFGaussBounds}}
 #' \code{\link{TestQFGaussBounds}}
 #'
-#' @docType package
+#' @aliases QForm-package
 #' @name QForm
 NULL
 

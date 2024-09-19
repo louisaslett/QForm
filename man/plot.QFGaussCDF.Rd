@@ -4,12 +4,12 @@
 \alias{plot.QFGaussCDF}
 \title{Plot method for a QFGaussCDF object}
 \usage{
-\method{plot}{QFGaussCDF}(cdf, ...)
+\method{plot}{QFGaussCDF}(x, ...)
 }
 \arguments{
-\item{cdf}{a QFGaussCDF}
-
 \item{...}{additional parameters}
+
+\item{cdf}{a QFGaussCDF}
 }
 \value{
 There is nothing returned.

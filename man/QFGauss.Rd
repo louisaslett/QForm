@@ -20,7 +20,9 @@ QFGauss(
 
 \item{df}{vector; positive real-valued degrees of freedom for each term (default is vector of 1s), can really increase speed if there are many redundant terms}
 
-\item{n}{numeric; number of points at which to evaluate the characteristic function of \eqn{T_f}, must be odd (see Details).}
+\item{sigma}{numeric; standard deviation of optional Gaussian term \eqn{Z_0}, default is 0 (no Gaussian term added)}
+
+\item{n}{integer; number of points at which to evaluate the characteristic function of \eqn{T_f}, must be odd (see Details).}
 
 \item{parallel.sapply}{function; a user-provided version of \code{sapply}, see Details.}
 }
@@ -28,10 +30,10 @@ QFGauss(
 A function that evaluates the CDF or PDF of \eqn{T_f}.
 }
 \description{
-Returns the CDF and PDF for random variables \eqn{T_f}{T_f} of the form \deqn{T_f = \sum\limits_i f\left(\eta_i \right) \left(Z_i + \delta_i)^2}{T_f = \Sigma_i f (\eta_i) (Z_i + \delta_i)^2} where \eqn{Z_i \sim N(0,1).}{Z_i ~ N(0,1).}
+Returns the CDF and PDF for random variables \eqn{T_f}{T_f} of the form \deqn{T_f = \sum\limits_i f\left(\eta_i \right) \left(Z_i + \delta_i)^2 + \sigma Z_0}{T_f = \Sigma_i f (\eta_i) (Z_i + \delta_i)^2 + \sigma Z_0} where \eqn{Z_i \sim N(0,1).}{Z_i ~ N(0,1).}
 }
 \details{
-By using the fast Fourier transform and various adjustments for numerical precision, this function is much faster and more reliable than Davie's method and related approaches.
+By using the fast Fourier transform and various adjustments for numerical precision, this function is faster and more reliable than Davie's method and related approaches, especially when the returned CDF or PDF is to be evaluated at many points.
 
 The returned function has three optional, logical arguments.  The first is a \code{density}, which when \code{TRUE}, prompts the function to evaluate the PDF rather than the CDF.  \code{density} defaults to FALSE.  \code{lower.tail} returns 1 minus the CDF when \code{TRUE} (not used if \code{density}==TRUE) and is highly recommended for those interested in the upper tail of \eqn{T_f}.  \code{log.p} returns the desired probabilities in log space.
 
@@ -51,7 +53,7 @@ f.eta <- c(-12, -7, 5, 7, -9, 10, 8)
 delta2 <- c(2, 10, -4, 3, 8, -5, -12)^2
 df <- c(1.1,5.2,0.4,10,1,2.5,1)
 
-cdf <- QFGauss(f.eta, delta2)
+cdf <- QFGauss(f.eta, delta2, df)
 
 # Inspect computed CDF
 plot(cdf)
@@ -59,7 +61,7 @@ plot(cdf)
 # Plot computed CDF at desired points
 x <- seq(-1500, 2000, len = 1e3)
 plot(x,cdf(x),type="l", ylab = expression(CDF),xlab=expression(T[f]), main=expression(CDF~of~T[f])) # CDF
-plot(x,cdf(x,density = T),type="l", ylab = expression(PDF),xlab=expression(T[f]), main=expression(PDF~of~T[f])) # PDF
+plot(x,cdf(x,density = TRUE),type="l", ylab = expression(PDF),xlab=expression(T[f]), main=expression(PDF~of~T[f])) # PDF
 
 # Compare computed CDF to empirical CDF of target distribution based on 10,000 samples
 TestQFGauss(cdf)

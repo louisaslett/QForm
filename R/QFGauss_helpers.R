@@ -73,7 +73,7 @@ extrapolate_tail<-function(log.cdf,xx.standardized,start,best,num.windows,right.
                   ifelse(right.side,"a.r and b.r","a.l and b.l"),
                   "to be reliably estimated with the given number of FFT grid points (set by QFGauss optional argument n). ",
                   "Consider increasing n."))
-    }
+  }
 
   if(interval.length<4){
     warning(paste(ifelse(right.side,"Right","Left"),"Tail Extrapolation Failed: the",
@@ -99,7 +99,7 @@ extrapolate_tail<-function(log.cdf,xx.standardized,start,best,num.windows,right.
   #a <- log.cdf[best]-xx.standardized[best]*b
 
   list("b" = b,"best" = best,"successful"=TRUE)
-  }
+}
 
 
 
@@ -110,7 +110,28 @@ condensed.log.rho.Q.easy.centered <-function(t,evals.s,ncps,df,a,mu.s,sigma.s){
     # NOTE: df used in the following line is correctly placed. We assume that the non-centrality parameters across
     # all of the chi-squares have already been summed up into a single non-centrality parameter.
     complex(imaginary = -t*(a+mu.s),real = -0.5*(sigma.s*t)^2)+sum(complex(imaginary=ncps*t*evals.s)/complex(real=1,imaginary=-2*t*evals.s)
-                                                                    - 0.5*df*log(complex(real=1,imaginary=-2*t*evals.s)))
+                                                                   - 0.5*df*log(complex(real=1,imaginary=-2*t*evals.s)))
+  }
+}
+
+# this is equivalent to the version above but just rearranged to minimize redundant computation
+rearranged.condensed.log.rho.Q.easy.centered <-function(t,
+                                                        a_plus_mu.s,
+                                                        neg_half_sigma.s_squared,
+                                                        ncps_times_evals.s,
+                                                        neg_half_df,
+                                                        neg_twice_evals.s,
+                                                        n_over_b_minus_a){
+  #one_plus_t_neg_twice_evals.s_squared <- 1 + t_neg_twice_evals.s^2
+  if(all(ncps_times_evals.s==0)){
+    complex(imaginary = -t*a_plus_mu.s,real = neg_half_sigma.s_squared*t^2) + sum(neg_half_df*log(complex(real=1,imaginary=t*neg_twice_evals.s)))
+  } else {
+    # NOTE: df used in the following line is correctly placed. We assume that the non-centrality parameters across
+    # all of the chi-squares have already been summed up into a single non-centrality parameter.
+    t_neg_twice_evals.s <- t*neg_twice_evals.s
+    complex(imaginary = -t*a_plus_mu.s,real = neg_half_sigma.s_squared*t^2) +
+      sum(complex(imaginary=ncps_times_evals.s*t)/complex(real=1,imaginary= t_neg_twice_evals.s)
+          + neg_half_df*log(complex(real=1,imaginary=t_neg_twice_evals.s)))
   }
 }
 
@@ -234,10 +255,32 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), df=rep(1,length(evals))
   # condensed_ncps <- Im(param_rle$values)
   # df <- param_rle$lengths
 
-  rho <- parallel.sapply(1:n, function(k, a.standardized, b.standardized, n, evals.s, ncps, df, mu.s,sigma.s) {
-    exp(condensed.log.rho.Q.easy.centered((pi*n/(b.standardized-a.standardized))*(2*((k-1)/n)-1),
-                                          evals.s,ncps, df, a.standardized,mu.s,sigma.s)) / (pi*(2*((k-1)/n)-1))
-  }, a.standardized = a.standardized, b.standardized = b.standardized, n = n, evals.s = evals.s, ncps = ncps, df = df, mu.s = mu.s, sigma.s = sigma.s)
+
+  a_plus_mu.s <- a.standardized + mu.s
+  neg_half_sigma.s_squared <- -0.5*(sigma.s)^2
+  ncps_times_evals.s <- ncps*evals.s
+  neg_half_df <- -0.5*df
+  neg_twice_evals.s <- -2*evals.s
+  n_over_b_minus_a <- n/(b.standardized-a.standardized)
+
+
+  temp_fft_func <- function(k) {
+    ki <- pi*(2*((k-1)/n)-1)
+    exp(rearranged.condensed.log.rho.Q.easy.centered(t = ki*n_over_b_minus_a,
+                                                     a_plus_mu.s = a_plus_mu.s,
+                                                     neg_half_sigma.s_squared = neg_half_sigma.s_squared,
+                                                     ncps_times_evals.s = ncps_times_evals.s,
+                                                     neg_half_df = neg_half_df,
+                                                     neg_twice_evals.s = neg_twice_evals.s,
+                                                     n_over_b_minus_a = n_over_b_minus_a)) / ki}
+
+  rho <- parallel.sapply(1:n,temp_fft_func)
+
+
+  # rho <- parallel.sapply(1:n, function(k, a.standardized, b.standardized, n, evals.s, ncps, df, mu.s,sigma.s) {
+  #   exp(condensed.log.rho.Q.easy.centered((pi*n/(b.standardized-a.standardized))*(2*((k-1)/n)-1),
+  #                                         evals.s,ncps, df, a.standardized,mu.s,sigma.s)) / (pi*(2*((k-1)/n)-1))
+  # }, a.standardized = a.standardized, b.standardized = b.standardized, n = n, evals.s = evals.s, ncps = ncps, df = df, mu.s = mu.s, sigma.s = sigma.s)
 
 
   fft_cdf <- 0.5 - (Im(fft(rho))*(-1)^(0:(n-1)))/n
@@ -400,7 +443,7 @@ calc.QFcdf <- function(evals, ncps=rep(0,length(evals)), df=rep(1,length(evals))
        "b.r" = b.r,
        "mu" = mu,
        "Q.sd" = Q.sd)
-  }
+}
 
 
 ##############################################
